@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="vi" data-layout="tall">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!-- ✏️ SỬA: tiêu đề và mô tả (hiện khi chia sẻ link lên Facebook, Zalo, Messenger...) -->
+  <title>Toandn · Hòn đảo anh đào</title>
+  <meta name="description" content="Hồ sơ pixel của Toandn — lập trình, pixel art và nhạc 8-bit. Mọi liên kết ở một nơi.">
+  <meta name="theme-color" content="#1f63d6">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Toandn · Hòn đảo anh đào">
+  <meta property="og:description" content="Ghé thăm hòn đảo anh đào pixel của mình — mọi liên kết ở một nơi.">
+  <!-- Sau khi triển khai, đổi thành đường dẫn đầy đủ, ví dụ https://ten-ban.netlify.app/assets/og-image.png -->
+  <meta property="og:image" content="assets/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23dc7ec8' d='M1 0h2v1h-2zM5 0h2v1h-2zM0 1h1v1h-1zM3 1h2v1h-2zM7 1h1v1h-1zM0 2h1v1h-1zM7 2h1v1h-1zM0 5h1v1h-1zM7 5h1v1h-1zM0 6h1v1h-1zM3 6h2v1h-2zM7 6h1v1h-1zM1 7h2v1h-2zM5 7h2v1h-2z'/%3E%3Cpath fill='%23ffccef' d='M1 1h2v1h-2zM5 1h2v1h-2zM1 2h6v1h-6zM1 3h2v1h-2zM5 3h2v1h-2zM1 4h2v1h-2zM5 4h2v1h-2zM1 5h6v1h-6zM1 6h2v1h-2zM5 6h2v1h-2z'/%3E%3Cpath fill='%23ffd86b' d='M3 3h2v1h-2zM3 4h2v1h-2z'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Cảnh pixel art: được vẽ bởi js/scene.js -->
+  <canvas id="scene" aria-hidden="true"></canvas>
+
+  <div class="hud">
+    <span class="hud-hint" id="musicHint">Bật nhạc 8-bit</span>
+    <button class="hud-btn" id="soundBtn" type="button" aria-pressed="false" aria-label="Bật nhạc">
+      <span class="ico"></span>
+      <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
+    <button class="hud-btn" id="shareBtn" type="button" aria-label="Chia sẻ trang này">
+      <span class="ico" data-icon="share"></span>
+    </button>
+  </div>
+
+  <div class="name-tag" id="nameTag" hidden aria-hidden="true"><span class="tag-title"></span><span class="tag-name"></span></div>
+  <div class="bubble" id="bubble" hidden aria-hidden="true"><span id="bubbleText"></span></div>
+  <p class="sr-only" id="live" aria-live="polite"></p>
+
+  <main class="page">
+    <div class="hero-spacer" aria-hidden="true"></div>
+
+    <article class="card">
+      <header class="card-head">
+        <div class="avatar">
+          <!-- Muốn dùng ảnh thật: thay dòng canvas bằng <img src="assets/avatar.png" alt="Ảnh đại diện"> -->
+          <canvas id="avatarCanvas" width="16" height="16" aria-hidden="true"></canvas>
+        </div>
+        <div class="who">
+          <!-- ✏️ SỬA: cấp độ, danh hiệu, tên, tên người dùng, nơi ở -->
+          <p class="lv"><b>LV 24</b>Lữ khách thời gian</p>
+          <h1 class="name">Toandn</h1>
+          <p class="handle">@toandn · Hà Nội, Việt Nam</p>
+        </div>
+      </header>
+
+      <p class="status"><span class="dot" aria-hidden="true"></span>Đang mở cơ hội hợp tác</p>
+
+      <section class="dialog" aria-label="Giới thiệu">
+        <span class="dialog-tag">Lời chào</span>
+        <p class="dialog-text" data-typewriter>
+          Chào lữ khách! Mình là Toàn — thích viết code, vẽ pixel và nghe nhạc 8-bit.
+          Hòn đảo nhỏ này cất giữ mọi đường dẫn của mình, cứ thong thả ghé chơi nhé.
+        </p>
+      </section>
+
+      <section class="sec" aria-labelledby="t-links">
+        <h2 class="sec-title" id="t-links">Liên kết</h2>
+        <ul class="links">
+          <li>
+            <a class="link" data-brand="github" href="https://github.com/toandn9x" target="_blank" rel="noopener">
+              <span class="link-icon"></span>
+              <span class="link-text"><span class="link-label">GitHub</span><span class="link-sub">Dự án &amp; mã nguồn</span></span>
+              <span class="link-arrow"></span>
+            </a>
+          </li>
+          <li>
+            <a class="link" data-brand="facebook" href="https://www.facebook.com/toandnt" target="_blank" rel="noopener">
+              <span class="link-icon"></span>
+              <span class="link-text"><span class="link-label">Facebook</span><span class="link-sub">@toandnt</span></span>
+              <span class="link-arrow"></span>
+            </a>
+          </li>
+          <li>
+            <a class="link" data-brand="instagram" href="https://www.instagram.com/#reactivated" target="_blank" rel="noopener">
+              <span class="link-icon"></span>
+              <span class="link-text"><span class="link-label">Instagram</span><span class="link-sub">Ảnh &amp; pixel art</span></span>
+              <span class="link-arrow"></span>
+            </a>
+          </li>
+          <li>
+            <a class="link" data-brand="tiktok" href="https://www.tiktok.com/@bantoangiauten" target="_blank" rel="noopener">
+              <span class="link-icon"></span>
+              <span class="link-text"><span class="link-label">TikTok</span><span class="link-sub">Video ngắn mỗi tuần</span></span>
+              <span class="link-arrow"></span>
+            </a>
+          </li>
+          <li>
+            <a class="link" data-brand="youtube" href="https://www.youtube.com/@ntoan8532" target="_blank" rel="noopener">
+              <span class="link-icon"></span>
+              <span class="link-text"><span class="link-label">YouTube</span><span class="link-sub">Nhạc chiptune &amp; devlog</span></span>
+              <span class="link-arrow"></span>
+            </a>
+          </li>
+          <li>
+            <a class="link" data-brand="mail" href="mailto:toandn9x@gmail.com" data-copy="toandn9x@gmail.com">
+              <span class="link-icon"></span>
+              <span class="link-text"><span class="link-label">Email</span><span class="link-sub">toandn9x@gmail.com · chạm để sao chép</span></span>
+              <span class="link-arrow"></span>
+            </a>
+          </li>
+          <li>
+            <a class="link" data-brand="web" href="https://toandn9x.github.io/mybio/" target="_blank" rel="noopener">
+              <span class="link-icon"></span>
+              <span class="link-text"><span class="link-label">Web site</span><span class="link-sub">Trang giới thiệu của mình</span></span>
+              <span class="link-arrow"></span>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <section class="sec" aria-labelledby="t-stats">
+        <h2 class="sec-title" id="t-stats">Chỉ số</h2>
+        <div class="stats">
+          <div class="stat" style="--v:86"><span>Code</span><span class="stat-bar"><i></i></span><span class="stat-val">86</span></div>
+          <div class="stat" style="--v:72"><span>Thiết kế</span><span class="stat-bar"><i></i></span><span class="stat-val">72</span></div>
+          <div class="stat" style="--v:64"><span>Âm nhạc</span><span class="stat-bar"><i></i></span><span class="stat-val">64</span></div>
+          <div class="stat" style="--v:99"><span>Cà phê</span><span class="stat-bar"><i></i></span><span class="stat-val">99</span></div>
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="t-bag">
+        <h2 class="sec-title" id="t-bag">Hành trang</h2>
+        <ul class="chips">
+          <li>Pixel art</li>
+          <li>Chiptune</li>
+          <li>Game indie</li>
+          <li>Du lịch</li>
+          <li>Nhiếp ảnh</li>
+          <li>Trà sữa</li>
+        </ul>
+      </section>
+
+      <footer class="foot">
+        <p>© <span data-year>2026</span> Toandn · Lữ khách thời gian</p>
+      </footer>
+    </article>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/pixel.js"></script>
+  <script src="js/chiptune.js"></script>
+  <script src="js/scene.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

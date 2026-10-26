@@ -14,11 +14,11 @@
     grass: ['#163a29', '#1e5431', '#297336', '#3c923a', '#5ab043', '#86cd52', '#b6eb75'],
     bark: ['#150d14', '#22161e', '#332229', '#473030', '#5d423b'],
     bloom: ['#66235d', '#8e3680', '#b955a8', '#dc7ec8', '#f2a4de', '#ffccef', '#fff0fa'],
-    sky: ['#1b5dd2', '#2167d9', '#2871e0', '#307be6', '#3986eb', '#4491ef', '#519cf2', '#60a8f5'],
-    far: ['#3a83e8', '#468fec', '#559cf0', '#68abf3'],
-    mid: ['#5a9cee', '#78b3f3', '#9bcaf8', '#c1e2fc', '#e7f6ff'],
-    bankB: ['#4b93ec', '#62a6f1', '#7fbaf6', '#a0d0fa', '#c3e5fd'],
-    bankF: ['#7bbcf5', '#99cff9', '#bae2fc', '#dbf2ff', '#fbfeff']
+    // trời gần như phẳng như ảnh gốc, chỉ đậm nhẹ ở trên
+    sky: ['#2e6fe3', '#3175e7', '#347aea', '#377fed', '#3a84ef', '#3e8af0', '#4290f1'],
+    // mây giữa trời: [tông đậm, tông sáng]
+    far: ['#4193f1', '#4ba3f5'],
+    mid: ['#4da6f7', '#5cc4f9']
   };
   var R = {};
   Object.keys(HEX).forEach(function (k) { R[k] = ramp(HEX[k]); });
@@ -317,98 +317,131 @@
   }
 
   /* ---------------------------------------------------------
-     MÂY: khối tròn ghép lại + hoa văn xoáy kiểu tường vân
+     MÂY (theo ảnh gốc): mảng màu phẳng không dither, mép trên là
+     các vòm rộng, dải lụa uốn sóng cuộn đuôi kiểu tường vân
      --------------------------------------------------------- */
-  function idxToCanvas(idx, w, h, rmp) {
-    var b = new PX.Buf(w, h);
-    for (var i = 0; i < idx.length; i++) if (idx[i] >= 0) { b.d[i] = rmp[idx[i]]; b.k[i] = 1; }
-    return b.canvas();
-  }
-
-  function curl(idx, orig, w, h, p, r) {
-    var cx = p.x + p.r * 0.05, cy = p.y + p.r * 0.12, r0 = p.r * 0.6, dir = r() < 0.5 ? 1 : -1;
-    var a0 = r.range(0, Math.PI * 2), span = Math.PI * r.range(1.3, 1.8);
-    for (var a = 0; a < span; a += 0.06) {
-      var rad = r0 * (1 - 0.45 * a / span);
-      var x = Math.round(cx + Math.cos(a0 + a * dir) * rad - 0.5), y = Math.round(cy + Math.sin(a0 + a * dir) * rad * 0.85 - 0.5);
-      if (x < 0 || y < 0 || x >= w || y >= h) continue;
-      var i = y * w + x;
-      if (orig[i] > 0) idx[i] = orig[i] - 1;
-    }
-  }
-
-  function buildCloud(r, w, h, rmp, curly) {
-    var idx = new Int8Array(w * h).fill(-1), L = rmp.length, puffs = [];
-    var n = Math.max(3, Math.round(w / 10));
-    for (var i = 0; i < n; i++) {
-      var t = (i + 0.5) / n, cen = Math.max(0, 1 - Math.abs(t - 0.5) * 1.6);
-      var pr = Math.max(3, h * (0.26 + 0.32 * cen) * r.range(0.85, 1.15));
-      puffs.push({ x: t * w + r.range(-2, 2), y: h - 1 - pr * r.range(0.55, 0.8), r: pr });
-    }
-    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
-      var best = -1, nx = 0, ny = 0;
-      for (var j = 0; j < puffs.length; j++) {
-        var p = puffs[j], dx = x + 0.5 - p.x, dy = y + 0.5 - p.y, d = Math.sqrt(dx * dx + dy * dy);
-        if (d > p.r) continue;
-        var k = 1 - d / p.r;
-        if (k > best) { best = k; nx = dx / p.r; ny = dy / p.r; }
+  function disc(buf, x, y, rad, c) {
+    var r2 = rad * rad + 0.25;
+    for (var yy = Math.floor(y - rad); yy <= Math.ceil(y + rad); yy++) {
+      for (var xx = Math.floor(x - rad); xx <= Math.ceil(x + rad); xx++) {
+        var dx = xx + 0.5 - x, dy = yy + 0.5 - y;
+        if (dx * dx + dy * dy <= r2) buf.set(xx, yy, c, 1);
       }
-      if (best < 0) continue;
-      var v = 0.6 - ny * 0.45 - nx * 0.08 - (y >= h - 2 ? 0.18 : 0);
-      idx[y * w + x] = PX.level(L, v, x, y);
     }
-    var orig = idx.slice();
-    for (i = w; i < idx.length; i++) if (orig[i] >= 0 && orig[i - w] < 0) idx[i] = Math.min(L - 1, orig[i] + 1);
-    if (curly) {
-      orig = idx.slice();
-      puffs.forEach(function (p) { if (p.r >= 6 && r() < 0.7) curl(idx, orig, w, h, p, r); });
-    }
-    return idxToCanvas(idx, w, h, rmp);
   }
 
-  // Biển mây lát ngang (nối liền khi lặp lại)
-  function buildBank(r, w, h, rmp, o) {
-    var idx = new Int8Array(w * h).fill(-1), L = rmp.length, puffs = [];
-    for (var row = 0; row < o.rows; row++) {
-      var x = r.range(0, 8), top = 2 + row * o.rMax * 0.75;
+  // Dải lụa: nét thuôn uốn sóng, cuối cuộn tròn vào trong (hình "~@")
+  // shape 'in' = mảnh → dày (cuộn to ở cuối), 'out' = dày → mảnh (đuôi móc nhỏ)
+  // up = -1 cuộn lên, 1 cuộn xuống; wrapW: vẽ lặp hai bên để lát liền mạch
+  function ribbon(buf, c, o, wrapW) {
+    var pts = [], n = Math.max(2, Math.round(o.len * 2)), ex = o.x, ey = o.y, et = o.thick;
+    for (var s = 0; s <= n; s++) {
+      var u = s / n;
+      et = o.shape === 'out' ? o.thick * (1 - u * 0.7)
+        : o.shape === 'in' ? o.thick * Math.min(1, 0.25 + u * 1.5)
+        : o.thick * (0.3 + 0.7 * Math.sin(Math.PI * u));   // 'mid': thuôn hai đầu
+      ex = o.x + o.dir * u * o.len;
+      ey = o.y + Math.sin(u * Math.PI * o.waves + o.phase) * o.amp;
+      pts.push([ex, ey, et]);
+    }
+    if (o.curl) {
+      var cx = ex, cy = ey + o.up * o.curl, th0 = Math.atan2(ey - cy, ex - cx), sign = o.dir * o.up;
+      var sweep = Math.PI * 1.6;
+      for (var a = 0; a <= sweep; a += 0.1) {
+        var k = a / sweep, rad = o.curl * (1 - 0.55 * k);
+        pts.push([cx + Math.cos(th0 + sign * a) * rad, cy + Math.sin(th0 + sign * a) * rad, Math.max(1, et * (1 - 0.55 * k))]);
+      }
+    }
+    pts.forEach(function (p) {
+      disc(buf, p[0], p[1], p[2] / 2, c);
+      if (wrapW) { disc(buf, p[0] - wrapW, p[1], p[2] / 2, c); disc(buf, p[0] + wrapW, p[1], p[2] / 2, c); }
+    });
+  }
+
+  // Biển mây: nhiều lớp màu phẳng chồng nhau (sau → trước), lát ngang liền mạch
+  function buildBank(r, w, h, layers) {
+    var buf = new PX.Buf(w, h);
+    layers.forEach(function (L) {
+      var c = PX.hex(L.col), prof = new Float32Array(w), x = r.range(0, 12), xx;
       while (x < w) {
-        var pr = r.range(o.rMin, o.rMax);
-        puffs.push({ x: x, y: top + r.range(0, 4) + pr, r: pr, row: row });
-        x += pr * r.range(1.1, 1.6);
-      }
-    }
-    var base = 2 + o.rows * o.rMax * 0.75 + o.rMin, solid = PX.level(L, 0.36 + o.tone, 0, 0);
-    var owner = new Int16Array(w * h).fill(-1);
-    for (var y = 0; y < h; y++) for (var xx = 0; xx < w; xx++) {
-      var best = -1, bi = -1, nx = 0, ny = 0;
-      for (var j = 0; j < puffs.length; j++) {
-        var p = puffs[j];
-        for (var wrap = -1; wrap <= 1; wrap++) {
-          var dx = xx + 0.5 - (p.x + wrap * w), dy = y + 0.5 - p.y, d = Math.sqrt(dx * dx + dy * dy);
-          if (d > p.r) continue;
-          var pri = p.row * 10 + (1 - d / p.r);
-          if (pri > best) { best = pri; bi = j; nx = dx / p.r; ny = dy / p.r; }
+        var bw = r.range(L.bw[0], L.bw[1]), bh = r.range(L.bh[0], L.bh[1]);
+        for (var k = -1; k <= 1; k++) {
+          var cx = x + k * w;
+          for (xx = Math.max(0, Math.floor(cx - bw / 2)); xx <= Math.min(w - 1, Math.ceil(cx + bw / 2)); xx++) {
+            var u = (xx + 0.5 - cx) / (bw / 2);
+            if (Math.abs(u) < 1) prof[xx] = Math.max(prof[xx], bh * Math.sqrt(1 - u * u));
+          }
         }
+        x += bw * r.range(0.55, 0.85);
       }
-      var i = y * w + xx;
-      if (bi < 0) { if (y >= base) idx[i] = solid; continue; }
-      owner[i] = bi;
-      var v = 0.58 - ny * 0.42 - nx * 0.06 + puffs[bi].row * 0.07 + o.tone;
-      idx[i] = PX.level(L, v, xx, y);
-    }
-    var orig = idx.slice();
-    for (i = w; i < idx.length; i++) {
-      if (orig[i] < 0 || owner[i] < 0) continue;
-      var up = owner[i - w];
-      if (orig[i - w] < 0 || (up >= 0 && puffs[up].row < puffs[owner[i]].row)) idx[i] = Math.min(L - 1, orig[i] + 1);
-    }
-    orig = idx.slice();
-    puffs.forEach(function (p) { if (p.r >= 9 && r() < 0.45) curl(idx, orig, w, h, p, r); });
-    return { img: idxToCanvas(idx, w, h, rmp), fill: HEX_FROM(rmp[solid]) };
+      for (xx = 0; xx < w; xx++) {
+        for (var y = Math.max(0, Math.round(L.top - prof[xx])); y < h; y++) buf.set(xx, y, c, 1);
+      }
+      // dải lụa sáng hơn lượn trên mặt lớp mây: thưa, to nhỏ khác nhau, có dải cuộn có dải không
+      var wc = PX.hex(L.wisp), n = Math.max(1, Math.round(w / (L.every * 1.5)));
+      for (var i = 0; i < n; i++) {
+        var curly = r() < 0.7;
+        ribbon(buf, wc, {
+          x: (i + r.range(0.1, 0.7)) * (w / n), y: L.top + r.range(2, 8), len: r.range(22, 46),
+          dir: r() < 0.5 ? 1 : -1, amp: r.range(1.5, 3.5), waves: r.range(0.8, 1.5), phase: r.range(0, Math.PI),
+          thick: r.range(4, 7), shape: curly ? 'in' : 'mid', curl: curly ? r.range(3.5, 5.5) : 0, up: r() < 0.75 ? -1 : 1
+        }, w);
+      }
+    });
+    return { img: buf.canvas(), fill: layers[layers.length - 1].col };
   }
-  function HEX_FROM(u) {
-    var rr = u & 0xff, gg = (u >> 8) & 0xff, bb = (u >> 16) & 0xff;
-    return 'rgb(' + rr + ',' + gg + ',' + bb + ')';
+
+  // Mây giữa trời: thân phồng nhỏ kéo theo đuôi dài uốn lượn có móc cuộn,
+  // tô hai tông như ảnh gốc: nửa trên sáng, nửa dưới đậm
+  function buildSkyCloud(r, w, h, cols) {
+    var shape = new PX.Buf(w, h), ON = 1;
+    var left = r() < 0.5, bodyW = w * r.range(0.3, 0.45);
+    var bx0 = left ? r.range(1, 4) : w - bodyW - r.range(1, 4), baseY = h - 2, x, xx, y;
+    x = bx0 + bodyW * 0.18;
+    while (x < bx0 + bodyW * 0.85) {
+      var bw = r.range(h * 0.7, h * 1.2), bh = r.range(h * 0.4, h * 0.85);
+      for (xx = Math.floor(x - bw / 2); xx <= Math.ceil(x + bw / 2); xx++) {
+        var u = (xx + 0.5 - x) / (bw / 2);
+        if (Math.abs(u) >= 1) continue;
+        for (y = Math.round(baseY - bh * Math.sqrt(1 - u * u)); y <= baseY; y++) shape.set(xx, y, ON, 1);
+      }
+      x += bw * r.range(0.45, 0.7);
+    }
+    var dir = left ? 1 : -1, sx = left ? bx0 + bodyW * 0.75 : bx0 + bodyW * 0.25;
+    var tail = Math.max(4, h * r.range(0.36, 0.46));
+    ribbon(shape, ON, {
+      x: sx, y: baseY - tail / 2 - r.range(0, h * 0.15), len: w - bodyW - 8, dir: dir, amp: r.range(1, h * 0.14),
+      waves: r.range(1, 1.8), phase: r.range(0, 1), thick: tail,
+      shape: 'out', curl: Math.max(3, tail * 0.75), up: -1
+    });
+    if (r() < 0.6) {
+      var tail2 = Math.max(3, h * 0.26);
+      ribbon(shape, ON, {
+        x: sx - dir * bodyW * 0.3, y: baseY - tail2 / 2, len: (w - bodyW) * r.range(0.4, 0.65), dir: dir, amp: r.range(1, 2),
+        waves: r.range(0.8, 1.4), phase: r.range(1, 2.5), thick: tail2, shape: 'out', curl: Math.max(2.5, tail2 * 0.8), up: 1
+      });
+    }
+
+    // Tô màu: mỗi cột, phần trên của mỗi đoạn mây là màu sáng
+    var out = new PX.Buf(w, h), base = PX.hex(cols[0]), light = PX.hex(cols[1]);
+    for (xx = 0; xx < w; xx++) {
+      y = 0;
+      while (y < h) {
+        if (!shape.kind(xx, y)) { y++; continue; }
+        var y0 = y;
+        while (y < h && shape.kind(xx, y)) y++;
+        var lit = Math.max(1, Math.round((y - y0) * 0.45));
+        for (var yy = y0; yy < y; yy++) out.set(xx, yy, yy < y0 + lit ? light : base, 1);
+      }
+    }
+    // Nét xoáy đậm bên trong thân mây
+    var swirl = new PX.Buf(w, h);
+    ribbon(swirl, ON, {
+      x: bx0 + bodyW * (left ? 0.25 : 0.75), y: baseY - h * 0.35, len: bodyW * 0.35, dir: dir, amp: 0.8,
+      waves: 1, phase: 0, thick: 1, shape: 'out', curl: Math.max(1.8, h * 0.13), up: 1
+    });
+    for (var i = 0; i < swirl.k.length; i++) if (swirl.k[i] && out.k[i]) out.d[i] = base;
+    return out.canvas();
   }
 
   function buildSky(W, H) {
@@ -499,12 +532,20 @@
     var tree = buildTree(seed + 101);
     var hero = makeCharacter(opts.character);
     var cr = PX.rng(seed + 55), i;
-    var farImgs = [], midImgs = [], wispImgs = [];
-    for (i = 0; i < 5; i++) farImgs.push(buildCloud(cr, cr.int(46, 78), cr.int(14, 22), R.far, true));
-    for (i = 0; i < 4; i++) midImgs.push(buildCloud(cr, cr.int(30, 52), cr.int(11, 17), R.mid, true));
-    for (i = 0; i < 2; i++) wispImgs.push(buildCloud(cr, cr.int(38, 54), cr.int(9, 12), R.mid, true));
-    var bankBack = buildBank(cr, 240, 52, R.bankB, { rMin: 7, rMax: 12, rows: 2, tone: -0.04 });
-    var bankFront = buildBank(cr, 208, 60, R.bankF, { rMin: 8, rMax: 14, rows: 3, tone: 0 });
+    var farImgs = [], midImgs = [];
+    for (i = 0; i < 4; i++) farImgs.push(buildSkyCloud(cr, cr.int(80, 130), cr.int(16, 24), HEX.far));
+    for (i = 0; i < 3; i++) midImgs.push(buildSkyCloud(cr, cr.int(56, 92), cr.int(13, 19), HEX.mid));
+    // Biển mây: lớp càng gần càng sáng và ngả xanh ngọc (màu lấy từ ảnh gốc)
+    var bankBack = buildBank(cr, 256, 56, [
+      { col: '#4597f0', wisp: '#4fa7f3', top: 16, bw: [28, 48], bh: [8, 14], every: 90 },
+      { col: '#53b2f4', wisp: '#5dc3f6', top: 34, bw: [24, 42], bh: [7, 12], every: 80 }
+    ]);
+    var bankFront = buildBank(cr, 224, 72, [
+      { col: '#5cc5f4', wisp: '#68d3f7', top: 14, bw: [26, 44], bh: [7, 13], every: 70 },
+      { col: '#68d3f7', wisp: '#78e0fa', top: 30, bw: [24, 40], bh: [6, 12], every: 64 },
+      { col: '#76dffa', wisp: '#8beefd', top: 46, bw: [22, 36], bh: [6, 11], every: 60 },
+      { col: '#84e7fb', wisp: '#9cf3fe', top: 60, bw: [20, 34], bh: [5, 10], every: 56 }
+    ]);
 
     var main = island.main, plat = island.plat, raise = island.raise, tb = island.treeBase;
     var treeDX = tb.x - tree.bx, treeDY = tb.y - tree.by;
@@ -512,7 +553,7 @@
     var SCENE_BOTTOM = island.bottom + 2;
 
     var W = 0, H = 0, scale = 1, dpr = 1, mode = 'tall', baseX = 0, baseY = 0, lastW = 0;
-    var sky = null, far = [], mid = [], wisps = [], stars = [];
+    var sky = null, far = [], mid = [], stars = [], seaTop = 0;
     var t = 0, last = 0, scrollV = 0, parX = 0, parT = 0;
     var petals = [], fx = [], marker = null, spawnAcc = 0;
     var shake = 0, gust = 0, nextGust = 9, birds = null, nextBirds = 5 + rnd() * 8;
@@ -558,15 +599,22 @@
 
       var lr = PX.rng(seed + W);
       var skyBottom = mode === 'tall' ? baseY + SCENE_BOTTOM - 40 : H * 0.62;
-      far = farImgs.concat(farImgs.slice(0, Math.ceil(W / 160))).map(function (img) {
-        return { img: img, x: lr() * (W + 120), y: Math.round(lr.range(4, skyBottom)), sp: lr.range(0.9, 1.8) };
-      });
-      mid = midImgs.map(function (img) {
-        return { img: img, x: lr() * (W + 120), y: Math.round(lr.range(baseY + 6, baseY + SCENE_BOTTOM - 36)), sp: lr.range(2.4, 3.6) };
-      });
-      wisps = wispImgs.map(function (img, j) {
-        return { img: img, x: lr() * (W + 260) + j * 160, y: Math.round(lr.range(baseY + 62, baseY + SCENE_BOTTOM - 30)), sp: lr.range(5, 7.5) };
-      });
+      // Mây thưa, rải đều theo các tầng cao độ để không chồng lên nhau
+      function spread(imgs, n, y0, y1, sp) {
+        var list = [];
+        for (var j = 0; j < n; j++) {
+          list.push({
+            img: imgs[j % imgs.length],
+            x: (j / n) * (W + 160) + lr.range(0, 40),
+            y: Math.round(y0 + (j + lr.range(0.1, 0.8)) / n * (y1 - y0)),
+            sp: lr.range(sp[0], sp[1])
+          });
+        }
+        return list;
+      }
+      far = spread(farImgs, 2 + Math.ceil(W / 220), 4, skyBottom, [0.9, 1.6]);
+      mid = spread(midImgs, W > 300 ? 3 : 2, baseY + 6, baseY + SCENE_BOTTOM - 40, [2.2, 3.2]);
+      seaTop = mode === 'wide' ? Math.round(H * 0.63) : baseY + SCENE_BOTTOM - 60;
       stars = [];
       for (var j = 0; j < Math.round(W / 30) + 3; j++) {
         stars.push({ x: Math.round(lr() * W), y: Math.round(lr.range(3, mode === 'tall' ? baseY + 70 : H * 0.55)), per: lr.range(2.4, 4.8), ph: lr() });
@@ -796,8 +844,10 @@
       var pxo = Math.round(parX * 3);
       drawLayer(far, 0.12, pxo);
       drawBirds(dt);
-      drawBank(bankBack, baseY + SCENE_BOTTOM - 42 - scrollV * 0.5, t * 2.2 + pxo * 2);
       drawLayer(mid, 0.22, pxo * 2);
+      // Biển mây nằm sau đảo (giống ảnh gốc: các mảnh đá nổi phía trước mây)
+      drawBank(bankBack, seaTop - 14 - scrollV * 0.5, t * 2 + pxo * 2);
+      drawBank(bankFront, seaTop + 14 - scrollV * 0.6, t * 3.5 + pxo * 3);
 
       var rise = reduce ? 0 : Math.round(Math.pow(1 - Math.min(1, t / 1.8), 3) * 80);
       var bob = reduce ? 0 : Math.round(Math.sin(t * 0.9) * 1.4);
@@ -831,11 +881,6 @@
         var fl = Math.sin(t * 5 + p.ph);
         px(p.x, p.y, Math.abs(fl) > 0.8 ? 2 : 1, 1, HEX.bloom[fl > 0.3 ? 5 : fl > -0.3 ? 4 : 3]);
       }
-
-      drawBank(bankFront, baseY + SCENE_BOTTOM - 14 - scrollV * 0.6, t * 4 + pxo * 3);
-      ctx.globalAlpha = 0.85;
-      drawLayer(wisps, 0.3, pxo * 4);
-      ctx.globalAlpha = 1;
 
       for (j = 0; j < fx.length; j++) {
         var f = fx[j];

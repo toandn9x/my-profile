@@ -47,6 +47,7 @@ window.SITE_CONFIG = {
     // Nhạc riêng: chép file vào thư mục assets rồi ghi đường dẫn, ví dụ 'assets/music.mp3'
     // Để trống '' = dùng nhạc 8-bit tự tạo
     file: 'assets/music.mp3',
+    autoStart: true,   // tự bật nhạc ở lần chạm đầu tiên vào trang (false = chỉ bật bằng nút ♪)
     volume: 0.6,   // 0 → 1
     bpm: 88        // nhịp độ (chỉ áp dụng cho nhạc 8-bit tự tạo)
   }

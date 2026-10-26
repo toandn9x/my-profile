@@ -178,34 +178,76 @@
       if (k >= 1) { clearInterval(fadeT); if (done) done(); }
     }, 30);
   }
+  function notify() { if (api.onchange) api.onchange(playing); }
+
+  // Trình duyệt chặn phát (chạm để cuộn trang chưa được tính là tương tác):
+  // trả về trạng thái tắt và chờ lần chạm sau, KHÔNG đổi sang nhạc 8-bit
+  function blocked() {
+    if (!playing) return;
+    playing = false;
+    clearInterval(timer);
+    if (track) track.pause();
+    if (ctx) master.gain.setValueAtTime(0.0001, ctx.currentTime);
+    notify();
+  }
+  // Chờ AudioContext chạy thật sự (dùng cho nhạc 8-bit)
+  function confirmCtx() {
+    return new Promise(function (resolve) {
+      var t0 = Date.now();
+      (function check() {
+        if (!playing) return resolve(false);
+        if (ctx.state === 'running') return resolve(true);
+        if (Date.now() - t0 > 500) { blocked(); return resolve(false); }
+        setTimeout(check, 50);
+      })();
+    });
+  }
   // File lỗi hoặc không tìm thấy → quay về nhạc 8-bit
   function fallback(err) {
-    if (err && err.name === 'AbortError') return;
-    if (!playing || useSynth) return;
+    if (!playing || useSynth) return Promise.resolve(false);
     console.warn('Không phát được "' + FILE + '", dùng nhạc 8-bit thay thế.', err || '');
     useSynth = true;
-    if (ctx) startSynth();
+    if (!ctx) { blocked(); return Promise.resolve(false); }
+    startSynth();
+    notify();
+    return confirmCtx();
   }
+  var attempt = 0;
   function playTrack() {
     if (!track) {
       track = new Audio(FILE);
       track.loop = true;
       track.preload = 'auto';
     }
-    track.volume = 0;
+    var my = ++attempt;
+    if (track.paused) track.volume = 0;
     var p = track.play();
-    if (p && p.then) p.then(function () { fadeTrack(Math.min(1, VOL), 800); }, fallback);
-    else fadeTrack(Math.min(1, VOL), 800);
+    if (!p || !p.then) { fadeTrack(Math.min(1, VOL), 800); return Promise.resolve(true); }
+    return p.then(function () {
+      if (my === attempt && playing) fadeTrack(Math.min(1, VOL), 800);
+      return true;
+    }, function (err) {
+      if (my !== attempt) return false;                       // đã có lần thử mới hơn
+      if (err && err.name === 'AbortError') return false;     // người xem vừa bấm tắt
+      if (err && err.name === 'NotAllowedError') { blocked(); return false; }
+      return fallback(err);
+    });
   }
 
   var api = {
+    onchange: null,
     get playing() { return playing; },
     get usesFile() { return !useSynth; },
+    // Trả về Promise<boolean>: true khi âm thanh đã thực sự phát
     start: function () {
       var hasCtx = init();
-      if (hasCtx && ctx.state === 'suspended') ctx.resume();
-      if (playing) return true;
-      if (!hasCtx && useSynth) return false;
+      if (hasCtx && ctx.state !== 'running') ctx.resume();
+      if (!hasCtx && useSynth) return Promise.resolve(false);
+      if (playing) {
+        // đang chờ trình duyệt cho phép: thử lại trong lần tương tác này
+        if (!useSynth && track && track.paused) return playTrack();
+        return useSynth ? confirmCtx() : Promise.resolve(true);
+      }
       playing = true;
       if (hasCtx) {
         var now = ctx.currentTime;
@@ -213,8 +255,8 @@
         master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now);
         master.gain.linearRampToValueAtTime(VOL * 0.7, now + 0.8);
       }
-      if (useSynth) startSynth(); else playTrack();
-      return true;
+      if (useSynth) { startSynth(); return confirmCtx(); }
+      return playTrack();
     },
     stop: function () {
       if (!playing) return;
@@ -231,7 +273,9 @@
     toggle: function () { if (playing) api.stop(); else api.start(); return playing; },
     // Hiệu ứng chỉ phát khi người xem đã bật âm thanh
     sfx: function (name) {
-      if (!ctx || !playing || !SFX[name] || ctx.state !== 'running') return;
+      if (!ctx || !playing || !SFX[name]) return;
+      if (ctx.state === 'suspended' && !document.hidden) ctx.resume();
+      if (ctx.state !== 'running') return;
       SFX[name](ctx.currentTime + 0.01);
     }
   };

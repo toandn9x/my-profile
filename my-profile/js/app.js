@@ -105,23 +105,38 @@
   if (!canPlay) { soundBtn.hidden = true; hint.hidden = true; }
   if (Chip && Chip.usesFile) hint.textContent = 'Bật nhạc';
   if (store('sakura-hint')) hint.hidden = true;
+  if (Chip) Chip.onchange = syncSound;   // ví dụ trình duyệt chặn phát → nút trở lại trạng thái tắt
+
+  // Tự bật nhạc ở lần chạm đầu tiên vào trang (trình duyệt không cho phát trước khi người xem
+  // tương tác). Nếu người xem từng bấm nút ♪ để tắt thì giữ nguyên lựa chọn đó.
+  // pointerup bắt được cả chạm vào vùng chữ trên iPhone (ở đó "click" không phát ra).
+  var AUTO_EVENTS = ['pointerup', 'click', 'keydown'];
+  function stopAuto() {
+    AUTO_EVENTS.forEach(function (ev) { window.removeEventListener(ev, autoStart, true); });
+  }
+  function autoStart(e) {
+    if (soundBtn.contains(e.target)) return;                       // để nút ♪ tự xử lý
+    if (e.type === 'pointerup' && e.pointerType === 'mouse') return; // chuột: đợi click
+    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+    Chip.start().then(function (ok) {
+      syncSound();
+      if (ok) { stopAuto(); hint.hidden = true; }                   // chưa được phép → thử lại lần chạm sau
+    });
+    syncSound();
+  }
+  var musicCfg = CFG.music || {};
+  if (canPlay && musicCfg.autoStart !== false && store('sakura-music') !== '0') {
+    AUTO_EVENTS.forEach(function (ev) { window.addEventListener(ev, autoStart, true); });
+  }
+
   soundBtn.addEventListener('click', function () {
+    stopAuto();
     Chip.toggle();
     syncSound();
     store('sakura-music', Chip.playing ? '1' : '0');
     store('sakura-hint', '1');
     hint.hidden = true;
   });
-  // Trình duyệt chặn tự phát nhạc: nếu lần trước đã bật, phát lại ở lần chạm đầu tiên
-  if (canPlay && store('sakura-music') === '1') {
-    var resume = function (e) {
-      ['click', 'keydown'].forEach(function (ev) { window.removeEventListener(ev, resume, true); });
-      if (soundBtn.contains(e.target) || Chip.playing) return;
-      Chip.start();
-      syncSound();
-    };
-    ['click', 'keydown'].forEach(function (ev) { window.addEventListener(ev, resume, true); });
-  }
   syncSound();
   // Ẩn nhãn gợi ý khi cuộn xuống để không đè lên nội dung
   var onScroll = function () { root.classList.toggle('scrolled', window.scrollY > 40); };

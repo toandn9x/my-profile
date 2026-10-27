@@ -413,6 +413,238 @@ body {
 }
 .hud-hint[hidden], .scrolled .hud-hint { display: none; }
 
+/* ---------- Thanh thời gian ---------- */
+.hud-btn.on { background: var(--panel-3); }
+.hud-btn.custom::after {   /* chấm vàng: đang xem thử giờ/mùa khác */
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+/* Điện thoại: sát đáy màn hình để luôn thấy hòn đảo.
+   Màn hình rộng: góc dưới bên trái, trên biển mây, không che thẻ hồ sơ. */
+.time-bar {
+  --night: #2a3473;
+  --dawn: #d69fc0;
+  --day: #3986eb;
+  --dusk: #e07b72;
+  position: fixed;
+  z-index: 7;
+  right: 0;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  left: 0;
+  width: min(560px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 8px 12px 10px;
+  color: var(--text);
+  background: var(--panel-solid);
+  box-shadow:
+    inset 0 0 0 3px var(--panel-3),
+    0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink);
+  transition: opacity 0.2s steps(3);
+  animation: bar-in 0.3s steps(5) backwards;
+}
+.time-bar[hidden] { display: none; }
+/* Màn hình rộng (thanh nằm trên biển mây): khi kéo giờ / tua nhanh thì mờ đi để nhìn xuyên thấy cảnh.
+   Điện thoại không cần vì thanh nằm dưới đảo, đè lên thẻ hồ sơ chứ không đè lên cảnh. */
+[data-layout="wide"] .time-bar.ghost { opacity: 0.5; }
+[data-layout="wide"] .time-bar {
+  right: auto;
+  bottom: 24px;
+  left: 24px;
+  width: min(44vw, 520px);
+  margin: 0;
+}
+[data-layout="tall"] body.tb-open .page { padding-bottom: 190px; }   /* vẫn cuộn tới hết thẻ được */
+
+.tb-top { display: flex; align-items: center; gap: 10px; }
+.tb-clock {
+  font-size: 34px;
+  line-height: 0.9;
+  letter-spacing: 1px;
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--pink-deep);
+}
+.tb-phase {
+  padding: 0 6px 1px;
+  font-size: 18px;
+  white-space: nowrap;
+  color: var(--ink);
+  background: var(--c, var(--day));
+  box-shadow: 0 -2px 0 0 var(--ink), 0 2px 0 0 var(--ink), -2px 0 0 0 var(--ink), 2px 0 0 0 var(--ink);
+}
+.tb-live {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--gold);
+}
+.tb-live::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  vertical-align: 2px;
+  background: currentColor;
+}
+.tb-live.on { color: var(--green); }
+.tb-live.on::before { animation: blink 1.2s steps(1) infinite; }
+.tb-icon, .tb-text {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  cursor: pointer;
+  box-shadow: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink);
+}
+.tb-icon { width: 32px; }
+.tb-icon svg { display: block; width: 13px; height: 13px; }
+#tpPlay { color: var(--ink); background: var(--gold); }
+.tb-text { padding: 0 10px; font-size: 18px; }
+
+/* Thanh giờ: nền tô theo khung giờ */
+.tb-track { position: relative; margin-top: 10px; }
+.tb-track::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 7px;
+  left: 7px;
+  height: 8px;
+  background: linear-gradient(90deg,
+    var(--night) 0 20.83%, var(--dawn) 20.83% 29.17%, var(--day) 29.17% 70.83%,
+    var(--dusk) 70.83% 81.25%, var(--night) 81.25% 100%);
+  box-shadow: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink);
+}
+#tpRange {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+#tpRange::-webkit-slider-runnable-track { height: 24px; background: transparent; }
+#tpRange::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 24px;
+  border: 0;
+  background: var(--gold);
+  box-shadow:
+    inset 0 -4px 0 rgba(0, 0, 0, 0.25),
+    0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink);
+}
+#tpRange::-moz-range-track { height: 24px; border: 0; background: transparent; }
+#tpRange::-moz-range-thumb {
+  width: 14px;
+  height: 24px;
+  border: 0;
+  border-radius: 0;
+  background: var(--gold);
+  box-shadow:
+    inset 0 -4px 0 rgba(0, 0, 0, 0.25),
+    0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink);
+}
+
+/* Ghim mốc đổi cảnh ngay dưới thanh giờ (bấm để nhảy tới); mốc đang hiện được khoanh vàng */
+.tb-pins { position: relative; height: 30px; margin: 0 7px; }
+.tb-pin {
+  position: absolute;
+  top: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 0 3px 2px;
+  border: 0;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transform: translateX(-50%);
+}
+.tb-pin::before {   /* chân ghim nối lên thanh giờ */
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 2px;
+  height: 6px;
+  margin-left: -1px;
+  background: var(--c);
+}
+.tb-pin i { display: block; width: 8px; height: 8px; background: var(--c); box-shadow: 0 0 0 2px var(--ink); }
+.tb-pin.active { color: var(--text); }
+.tb-pin.active i { box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--gold); }
+
+/* Bốn mùa, ghi kèm tháng bắt đầu; mùa đang hiện được tô màu, chấm vàng = mùa hiện tại */
+.tb-seasons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 4px; padding: 2px; }
+.tb-season {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  border: 0;
+  font: inherit;
+  font-size: 18px;
+  color: var(--text);
+  background: var(--panel-2);
+  cursor: pointer;
+  box-shadow:
+    inset 0 3px 0 0 var(--c),
+    0 -2px 0 0 var(--ink), 0 2px 0 0 var(--ink), -2px 0 0 0 var(--ink), 2px 0 0 0 var(--ink);
+}
+.tb-season small { font-size: 14px; color: var(--muted); }
+.tb-season.sel { color: var(--ink); background: var(--c); }
+.tb-season.sel small { color: var(--ink); }
+.tb-season.now::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 4px;
+  height: 4px;
+  background: var(--gold);
+}
+.tb-season.sel.now::after { background: var(--ink); }
+.tb-icon:active, .tb-text:active, .tb-season:active { transform: translateY(2px); }
+.tb-icon:focus-visible, .tb-text:focus-visible, .tb-pin:focus-visible, .tb-season:focus-visible, #tpRange:focus-visible {
+  outline: 3px dashed var(--gold);
+  outline-offset: 3px;
+}
+@keyframes bar-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+/* Màn hẹp: trạng thái chỉ còn dấu chấm (xanh = giờ thật, vàng = xem thử) */
+@media (max-width: 480px) {
+  .tb-live { flex: 1; font-size: 0; }
+  .tb-live::before { width: 8px; height: 8px; margin: 0; }
+}
+@media (max-width: 360px) {
+  .tb-clock { font-size: 30px; }
+  .tb-top { gap: 8px; }
+}
+
 /* ---------- Tên trên đầu nhân vật ---------- */
 .name-tag {
   --tag-color: #ffe45c;

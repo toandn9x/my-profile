@@ -155,6 +155,17 @@
     step: function (t) { tone(sfxBus, p50, midi(72), t, 0.03, 0.04, { sustain: 0.4, release: 0.02 }); tone(sfxBus, p50, midi(79), t + 0.05, 0.03, 0.04, { sustain: 0.4, release: 0.02 }); },
     chime: function (t) { [84, 88, 91, 96].forEach(function (m, i) { tone(sfxBus, 'triangle', midi(m), t + i * 0.06, 0.16, 0.13, { release: 0.25, send: 0.5 }); }); },
     sparkle: function (t) { [91, 96].forEach(function (m, i) { tone(sfxBus, p12, midi(m + [0, 2, 4][Math.random() * 3 | 0]), t + i * 0.07, 0.06, 0.04, { release: 0.12, send: 0.5 }); }); },
+    meow: function (t) {
+      tone(sfxBus, p25, 620, t, 0.09, 0.07, { slide: 900, slideTime: 0.08, sustain: 0.8, release: 0.02 });
+      tone(sfxBus, p25, 900, t + 0.09, 0.24, 0.07, { slide: 520, slideTime: 0.24, sustain: 0.7, release: 0.08, vib: true });
+    },
+    chirp: function (t) {
+      [0, 0.09, 0.15].forEach(function (d) { tone(sfxBus, p12, 2400, t + d, 0.04, 0.035, { slide: 3300, slideTime: 0.04, sustain: 0.5, release: 0.02 }); });
+    },
+    hoot: function (t) {
+      tone(sfxBus, 'triangle', 392, t, 0.22, 0.16, { slide: 349, slideTime: 0.22, sustain: 0.8, release: 0.1, send: 0.4 });
+      tone(sfxBus, 'triangle', 392, t + 0.36, 0.34, 0.16, { slide: 330, slideTime: 0.34, sustain: 0.8, release: 0.14, send: 0.4 });
+    },
     secret: function (t) { [72, 76, 79, 84, 88, 91, 96, 100].forEach(function (m, i) { tone(sfxBus, p25, midi(m), t + i * 0.07, 0.12, 0.07, { release: 0.2, send: 0.6, vib: i === 7 }); }); }
   };
 

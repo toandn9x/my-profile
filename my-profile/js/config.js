@@ -9,9 +9,10 @@ window.SITE_CONFIG = {
   // Lời nhân vật nói khi được chạm vào (lần lượt)
   greetings: [
     'Xin chào, lữ khách! Chào mừng đến hòn đảo của Toandn.',
-    'Hôm nay trời đẹp ghê, hoa anh đào nở rộ rồi đó.',
+    'Hôm nay trời đẹp ghê, hoa đang nở rộ rồi đó.',
     'Kéo xuống dưới để xem các liên kết của mình nhé!',
-    'Chạm vào bãi cỏ để mình đi dạo một vòng~',
+    'Chạm vào bãi cỏ để mình đi dạo một vòng ~',
+    'Bạn có thấy cái cây đằng kia giống cây cô đơn không? Chạm vào nó thử xem!',
     'Bật nhạc ở góc trên bên phải nghe thử đi!'
   ],
   hint: 'Thử chạm vào cây anh đào xem!',
@@ -21,7 +22,30 @@ window.SITE_CONFIG = {
     'Đếm thử xem có bao nhiêu cánh hoa?'
   ],
   // Chạm vào cây 7 lần để mở
-  secret: 'Bạn tìm ra bí mật rồi! Cảm ơn đã ghé chơi nha.',
+  secret: 'Bạn tìm ra bí mật rồi! Cảm ơn đã ghé chơi nha ^^',
+
+  // Mùa & giờ trong ngày. 'auto' = theo tháng / giờ trên máy người xem.
+  // Xem thử nhanh bằng đường dẫn: index.html?season=winter&time=night
+  world: {
+    season: 'auto',      // 'auto' | 'spring' | 'summer' | 'autumn' | 'winter'
+    time: 'auto',        // 'auto' | 'dawn' | 'day' | 'dusk' | 'night'
+    cat: true,           // mèo ngủ cạnh gốc cây
+    butterflies: true,   // bướm bay ban ngày
+    birds: true          // chim sẻ ban ngày, cú mèo ban đêm
+  },
+  // Câu chào đầu tiên theo giờ (giờ nào bỏ trống thì dùng câu đầu trong greetings)
+  timeGreetings: {
+    dawn: 'Chào buổi sớm, lữ khách! Bình minh trên đảo đẹp lắm.',
+    dusk: 'Hoàng hôn rồi, ngồi ngắm mặt trời lặn với mình nhé.',
+    night: 'Khuya rồi mà vẫn ghé chơi à? Đèn lồng sáng cả rồi đó.'
+  },
+  // Câu nói khi chạm vào cây theo mùa (mùa nào bỏ trống thì dùng treeLines)
+  seasonTreeLines: {
+    summer: ['Bóng cây mát ghê...', 'Ve kêu râm ran khắp đảo.'],
+    autumn: ['Lá phong rơi đỏ cả đảo rồi!', 'Mùa thu tới rồi đó.'],
+    winter: ['Tuyết rơi lạnh quá...', 'Cây cũng khoác áo trắng rồi kìa.']
+  },
+  catLine: 'Suỵt... mèo đang ngủ đó, nhẹ tay thôi nha!',
 
   // Tên nổi trên đầu nhân vật (giống tên người chơi trong game nhập vai)
   nameTag: {

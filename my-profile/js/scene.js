@@ -24,6 +24,82 @@
   var R = {};
   Object.keys(HEX).forEach(function (k) { R[k] = ramp(HEX[k]); });
 
+  /* ---------------------------------------------------------
+     THỜI GIAN TRONG NGÀY: bầu trời, mây, biển mây, ánh sáng phủ lên đảo
+     bank: [màu lớp, màu dải lụa] cho 2 lớp sau + 4 lớp trước
+     --------------------------------------------------------- */
+  var PHASES = {
+    dawn: {
+      sky: ['#4a5bb5', '#5f66bc', '#7974c3', '#9682c7', '#b690c6', '#d69fc0', '#eeb0b6', '#ffc4a8'],
+      far: ['#8a83c6', '#a391cb', '#c1a2cf', '#ddb5d3', '#f4ccd9'],
+      mid: ['#9a8acb', '#bf9bce', '#e4b1cc', '#fdcfcf', '#fff0ea'],
+      bank: [['#8d86cf', '#9a92d3'], ['#a493d3', '#b29fd6'], ['#bea1d4', '#cdaed8'], ['#d6b0d5', '#e4bfd9'], ['#ebc0d4', '#f6cfd9'], ['#f9d2d2', '#ffe0dc']],
+      tint: 'rgba(255,170,160,0.12)', sun: ['#ffb27a', '#ffd49a', '#fff1cf'], theme: '#5f66bc'
+    },
+    day: {
+      sky: HEX.sky, far: HEX.far, mid: HEX.mid,
+      bank: [['#4597f0', '#4fa7f3'], ['#53b2f4', '#5dc3f6'], ['#5cc5f4', '#68d3f7'], ['#68d3f7', '#78e0fa'], ['#76dffa', '#8beefd'], ['#84e7fb', '#9cf3fe']],
+      tint: null, theme: '#2e6fe3'
+    },
+    dusk: {
+      sky: ['#2c2f7a', '#3d3485', '#543b8d', '#703f8f', '#8e448c', '#b04d86', '#d25e7e', '#ee7a72'],
+      far: ['#6a4a92', '#895496', '#ae6396', '#d27992', '#f19992'],
+      mid: ['#7a4f96', '#a65e98', '#d57696', '#f99b95', '#ffcaa6'],
+      bank: [['#5d4796', '#684f9c'], ['#764f9c', '#8158a2'], ['#9157a0', '#9e60a5'], ['#ad629f', '#ba6ca4'], ['#c86d9c', '#d478a2'], ['#e07b98', '#ea889f']],
+      tint: 'rgba(255,105,85,0.16)', sun: ['#ff8a5c', '#ffb070', '#ffe0a3'], flies: 4, theme: '#3d3485'
+    },
+    night: {
+      sky: ['#070b24', '#0b112f', '#0f1739', '#141e45', '#1a2651', '#202e5d', '#273769'],
+      far: ['#1d2858', '#253263', '#2f3d70', '#3b4a7e', '#4a5a8f'],
+      mid: ['#222e60', '#2c396c', '#3a4879', '#4c5b8c', '#64749f'],
+      bank: [['#141c48', '#19224f'], ['#18224f', '#1d2856'], ['#1d2858', '#232f60'], ['#232f61', '#293669'], ['#29376b', '#303f73'], ['#304075', '#37487d']],
+      tint: 'rgba(12,16,60,0.46)', moon: true, lanterns: true, flies: 12, theme: '#0b112f'
+    }
+  };
+
+  /* ---------------------------------------------------------
+     BỐN MÙA: màu tán cây, mặt cỏ, thứ rơi xuống, đồ trang trí trên cỏ
+     --------------------------------------------------------- */
+  var SEASONS = {
+    spring: {
+      leaf: HEX.bloom, grass: HEX.grass, fall: ['#dc7ec8', '#f2a4de', '#ffccef'], rate: 1.7,
+      flowers: ['#fff6e0', '#ffe27a', '#ffb8e4', '#c9f4ff'], litter: ['#dc7ec8', '#f2a4de', '#ffccef'], flies: 1
+    },
+    summer: {
+      leaf: ['#10342c', '#164d38', '#1f6a40', '#2b8946', '#40a650', '#64c25c', '#97dd78'], grass: HEX.grass,
+      fall: ['#2b8946', '#40a650', '#64c25c'], rate: 0.35,
+      flowers: ['#fff6e0', '#ffe27a', '#ffffff', '#c9f4ff', '#ffb8e4'], litter: null, flies: 1.6
+    },
+    autumn: {
+      leaf: ['#4e1616', '#7e2418', '#ad3c1c', '#d45e26', '#ec8a35', '#f7b454', '#ffd88a'],
+      grass: ['#2b3518', '#435020', '#5f6a27', '#7f8530', '#a2a03e', '#c4bb56', '#e3d685'],
+      fall: ['#ad3c1c', '#d45e26', '#ec8a35'], rate: 2.2,
+      flowers: ['#ffe27a', '#fff6e0'], litter: ['#ad3c1c', '#d45e26', '#ec8a35', '#f7b454'], flies: 0.8
+    },
+    winter: {
+      leaf: ['#4d5b84', '#6f80aa', '#97a8cc', '#bccbe5', '#dbe5f4', '#eef3fb', '#ffffff'],
+      grass: ['#5d6b93', '#7e8fb7', '#a3b3d5', '#c4d1ea', '#dde6f5', '#eef3fb', '#ffffff'],
+      fall: ['#dbe5f4', '#eef3fb', '#ffffff'], rate: 0.2, flowers: [], litter: null, snow: true, flies: 0
+    }
+  };
+
+  // Mốc đổi cảnh trong ngày (giờ bắt đầu) và tháng bắt đầu mỗi mùa — dùng chung với đồng hồ thời gian
+  var PHASE_MARKS = [{ h: 5, key: 'dawn' }, { h: 7, key: 'day' }, { h: 17, key: 'dusk' }, { h: 19.5, key: 'night' }];
+  var SEASON_STARTS = [{ m: 3, key: 'spring' }, { m: 6, key: 'summer' }, { m: 9, key: 'autumn' }, { m: 12, key: 'winter' }];
+  function phaseAtHour(h) {
+    var key = 'night';
+    PHASE_MARKS.forEach(function (mk) { if (h >= mk.h) key = mk.key; });
+    return key;
+  }
+  function phaseAt(d) { return phaseAtHour(d.getHours() + d.getMinutes() / 60); }
+  function seasonOfMonth(m) {   // m: 1–12
+    return m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <= 8 ? 'summer' : m >= 9 && m <= 11 ? 'autumn' : 'winter';
+  }
+  function seasonAt(d) { return seasonOfMonth(d.getMonth() + 1); }
+
+  // Bảng màu đang dùng cho các hàm dựng hình (đổi theo mùa/giờ trước khi dựng)
+  var T = { grass: R.grass, leaf: R.bloom, sky: R.sky, flowers: SEASONS.spring.flowers, litter: SEASONS.spring.litter };
+
   function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 
   // Hình siêu elip (mặt trên của đảo, nhìn phối cảnh)
@@ -106,13 +182,13 @@
         var gv = o.grass + (nz - 0.5) * 0.4 - ((x - o.cx) / o.rx) * 0.07 + ((y - o.cy) / Math.max(1, o.ry)) * 0.05;
         if (y === B[x]) gv -= 0.2;
         if (y === F[x]) gv = 0.95; else if (y === F[x] - 1) gv += 0.1;
-        buf.set(x, y, PX.pick(R.grass, gv, x, y), 2);
+        buf.set(x, y, PX.pick(T.grass, gv, x, y), 2);
       }
       var s2 = Math.floor(x / 2);
       if (!(s2 in drip)) drip[s2] = r.pick(o.drip || [1, 1, 2, 2, 2, 3, 3, 4]);
       var len = Math.min(drip[s2], D[x] - 1);
       for (k = 1; k <= len; k++) {
-        buf.set(x, F[x] + k, PX.pick(R.grass, 0.58 - k * 0.1 - (k === len ? 0.14 : 0), x, F[x] + k), 5);
+        buf.set(x, F[x] + k, PX.pick(T.grass, 0.58 - k * 0.1 - (k === len ? 0.14 : 0), x, F[x] + k), 5);
       }
     }
     return { F: F, B: B, D: D, x0: x0, x1: x1 };
@@ -149,26 +225,28 @@
       var x = +key;
       for (var k = 1; k <= 2; k++) {
         var y = P.F[x] + raise + k;
-        if (buf.kind(x, y) === 2) buf.set(x, y, PX.pick(R.grass, 0.28 + k * 0.09, x, y), 2);
+        if (buf.kind(x, y) === 2) buf.set(x, y, PX.pick(T.grass, 0.28 + k * 0.09, x, y), 2);
       }
     });
 
-    // Cỏ lún phún, hoa dại, cánh hoa rơi
+    // Cỏ lún phún, hoa dại, cánh hoa / lá rụng theo mùa.
+    // Số lần gọi r() giống nhau ở mọi mùa để hình các mảnh đá phía sau không đổi khi đổi mùa.
     function onTop(x, y) { return buf.kind(x, y) === 2 && buf.kind(x, y - 1) === 2 && buf.kind(x, y + 1) === 2 && buf.kind(x, y + 2) === 2; }
-    var flowers = ['#fff6e0', '#ffe27a', '#ffb8e4', '#c9f4ff'];
+    function tuft(x, y) { buf.set(x, y, T.grass[6], 3); buf.set(x, y + 1, T.grass[3], 3); }
     for (var i = 0; i < 120; i++) {
       var x = r.int(M.x0 + 3, M.x1 - 3), y = r.int(main.cy - main.ry - 6, main.cy + main.ry);
+      var t = r(), pf = r(), pl = r();
       if (!onTop(x, y)) continue;
-      var t = r();
-      if (t < 0.5) { buf.set(x, y, R.grass[6], 3); buf.set(x, y + 1, R.grass[3], 3); }
-      else if (t < 0.7) buf.set(x, y, R.grass[2], 3);
-      else if (t < 0.84) { buf.set(x, y, PX.hex(r.pick(flowers)), 3); buf.set(x, y + 1, R.grass[2], 3); }
-      else buf.set(x, y, R.bloom[r.int(4, 5)], 3);
+      if (t < 0.5) tuft(x, y);
+      else if (t < 0.7) buf.set(x, y, T.grass[2], 3);
+      else if (t < 0.84 && T.flowers.length) { buf.set(x, y, PX.hex(T.flowers[Math.floor(pf * T.flowers.length)]), 3); buf.set(x, y + 1, T.grass[2], 3); }
+      else if (t >= 0.84 && T.litter) buf.set(x, y, PX.hex(T.litter[Math.floor(pl * T.litter.length)]), 3);
+      else tuft(x, y);
     }
     for (i = 0; i < 26; i++) {
-      var a = r() * Math.PI * 2, d = r.range(4, 26);
+      var a = r() * Math.PI * 2, d = r.range(4, 26), pc = r();
       var px = Math.round(platG.cx + Math.cos(a) * d * 1.3), py = Math.round(platG.cy - raise + Math.sin(a) * d * 0.35);
-      if (buf.kind(px, py) === 2) buf.set(px, py, R.bloom[r.int(3, 5)], 3);
+      if (T.litter && buf.kind(px, py) === 2) buf.set(px, py, PX.hex(T.litter[Math.floor(pc * T.litter.length)]), 3);
     }
     outlineRock(buf);
 
@@ -270,7 +348,7 @@
         var lam = -nx * 0.55 - ny * 0.83;
         var v = 0.5 + lam * 0.36 + (PX.vnoise(xx * 0.4, yy * 0.4, seed) - 0.5) * 0.22 + (back ? -0.2 : 0.04);
         if (best < 0.16 && ny > 0.3) v -= 0.12;
-        buf.set(xx, yy, PX.pick(R.bloom, v, xx, yy), back ? 3 : 2);
+        buf.set(xx, yy, PX.pick(T.leaf, v, xx, yy), back ? 3 : 2);
       }
     }
 
@@ -306,15 +384,27 @@
       if (kd === 1) {
         if (!dn || !rt || !lf) buf.d[id] = R.bark[0];
       } else {
-        if (!dn) buf.d[id] = R.bloom[kd === 3 ? 0 : 1];
-        else if (!up) buf.d[id] = R.bloom[kd === 3 ? 3 : 5];
-        if (!up && yy > 0 && r() < 0.16) buf.set(xx, yy - 1, R.bloom[5], 2);
+        if (!dn) buf.d[id] = T.leaf[kd === 3 ? 0 : 1];
+        else if (!up) buf.d[id] = T.leaf[kd === 3 ? 3 : 5];
+        if (!up && yy > 0 && r() < 0.16) buf.set(xx, yy - 1, T.leaf[5], 2);
         if (r() < 0.3) spawn.push([xx, yy]);
       }
     }
     for (i = 0; i < buf.k.length; i++) if (buf.k[i]) { top = Math.floor(i / W); break; }
 
-    return { canvas: buf.canvas(), W: W, H: H, bx: bx, by: by, top: top, mask: buf.k, spawn: spawn };
+    // Chỗ chim đậu (đỉnh tán phía trên ngọn cành) và chỗ treo đèn lồng (mép dưới tán)
+    var perches = [], hangs = [];
+    tips.forEach(function (tp) {
+      var x = Math.round(tp[0]);
+      if (x < 3 || x >= W - 3) return;
+      for (var yy = 0; yy < H && !buf.k[yy * W + x]; yy++);
+      if (yy > 1 && yy < by - 30) perches.push([x, yy]);
+      yy = Math.round(tp[1]);
+      while (yy < H && buf.k[yy * W + x]) yy++;
+      if (yy < by - 20 && yy - tp[1] < 16) hangs.push([x, yy]);
+    });
+
+    return { canvas: buf.canvas(), W: W, H: H, bx: bx, by: by, top: top, mask: buf.k, spawn: spawn, perches: perches, hangs: hangs };
   }
 
   /* ---------------------------------------------------------
@@ -475,7 +565,7 @@
     var b = new PX.Buf(W, H);
     for (var y = 0; y < H; y++) {
       var v = y / Math.max(1, H - 1);
-      for (var x = 0; x < W; x++) b.d[y * W + x] = PX.pick(R.sky, v, x, y, 'bayer');
+      for (var x = 0; x < W; x++) b.d[y * W + x] = PX.pick(T.sky, v, x, y, 'bayer');
     }
     return b.canvas();
   }
@@ -546,38 +636,183 @@
   }
 
   /* ---------------------------------------------------------
+     SINH VẬT & VẬT TRANG TRÍ: sprite từ chuỗi ký tự (mỗi ký tự là một màu)
+     --------------------------------------------------------- */
+  function spriteFrom(rows, pal, outline) {
+    var w = rows[0].length + 2, h = rows.length + 2, b = new PX.Buf(w, h), x, y;
+    rows.forEach(function (row, yy) {
+      for (var xx = 0; xx < row.length; xx++) if (row[xx] !== '.') b.set(xx + 1, yy + 1, PX.hex(pal[row[xx]]), 1);
+    });
+    if (outline) {
+      var k0 = b.k.slice(), oc = PX.hex(outline);
+      for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+        var i = y * w + x;
+        if (k0[i]) continue;
+        if ((x > 0 && k0[i - 1]) || (x < w - 1 && k0[i + 1]) || (y > 0 && k0[i - w]) || (y < h - 1 && k0[i + w])) b.set(x, y, oc, 2);
+      }
+    }
+    return b.canvas();
+  }
+  function flipped(cv) {
+    var c = PX.canvas(cv.width, cv.height), g = c.getContext('2d');
+    g.translate(cv.width, 0); g.scale(-1, 1); g.drawImage(cv, 0, 0);
+    return c;
+  }
+  var INK = '#1a1226';
+
+  // Mèo cam cuộn tròn ngủ (quay mặt sang trái)
+  function buildCat() {
+    var pal = { o: '#f2a54e', s: '#c8702f', w: '#ffe7bd', e: '#4a2a1a', y: '#c8f26a', n: '#ff8fa3' };
+    var body = ['noooosooso', '.wooososoo', '.ww.wwoooo'];
+    return {
+      sleep: spriteFrom(['.o..o.....', '.oooo.....', 'oeoeooooo.'].concat(body), pal, INK),
+      breathe: spriteFrom(['.o..o.....', '.oooooo...', 'oeoeoooooo'].concat(body), pal, INK),
+      awake: spriteFrom(['.o..o....o', '.oooo....o', 'oyoyoooooo', 'noooosooso', '.wooososoo', '.ww.ww.ww.'], pal, INK)
+    };
+  }
+
+  // Chim sẻ (quay sang phải) + cú mèo cho ban đêm
+  function buildBirds() {
+    var sp = { b: '#8a5a3a', w: '#f0d9b0', e: '#1a1226', k: '#ffb347', t: '#5e3b26', f: '#3a2a20' };
+    var sit = spriteFrom(['..bb..', '.bbbek', 'tbwbb.', 't.ww..', '..ff..'], sp, INK);
+    var peck = spriteFrom(['......', '..bb..', 'tbbbek', 't.wwb.', '..ff..'], sp, INK);
+    var up = spriteFrom(['b...b.', '.bbbek', '..ww..'], sp, INK);
+    var down = spriteFrom(['.bbbek', 'b.ww.b'], sp, INK);
+    var op = { b: '#6e5236', l: '#c9a77a', y: '#ffe066', k: '#ffb347' };
+    var owlRows = ['b...b', 'bbbbb', 'bybyb', 'bbkbb', 'blllb', '.bbb.'];
+    return {
+      sit: [sit, flipped(sit)], peck: [peck, flipped(peck)], up: [up, flipped(up)], down: [down, flipped(down)],
+      owl: spriteFrom(owlRows, op, INK),
+      owlBlink: spriteFrom(owlRows.map(function (r) { return r.replace(/y/g, 'b'); }), op, INK)
+    };
+  }
+
+  // Đèn lồng giấy: móc, nắp, thân đỏ có lõi sáng, nắp dưới, tua
+  function buildLantern() {
+    return spriteFrom(['.k.', 'kkk', 'rLr', 'rLr', 'kkk', '.r.'], { k: '#3a1e1e', r: '#e8553a', L: '#ffd27a' }, null);
+  }
+
+  // Trăng khuyết = hình tròn trừ đi một hình tròn lệch
+  function buildMoon() {
+    var S = 15, b = new PX.Buf(S, S), c = PX.hex('#fff4c8'), e = PX.hex('#e7d495'), d = PX.hex('#efdfa8');
+    for (var y = 0; y < S; y++) for (var x = 0; x < S; x++) {
+      var ax = x + 0.5 - 7.5, ay = y + 0.5 - 7.5, bx = x + 0.5 - 10.5, by = y + 0.5 - 5;
+      var inA = ax * ax + ay * ay <= 42, inB = bx * bx + by * by <= 30;
+      if (inA && !inB) b.set(x, y, (ax * ax + ay * ay > 30) ? e : c, 1);
+    }
+    [[4, 8], [5, 11], [3, 6]].forEach(function (p) { if (b.kind(p[0], p[1])) b.set(p[0], p[1], d, 1); });
+    return b.canvas();
+  }
+
+  // Mặt trời lúc bình minh / hoàng hôn: 3 vòng màu
+  function buildSun(cols) {
+    var S = 29, b = new PX.Buf(S, S), cc = cols.map(function (c) { return PX.hex(c); });
+    for (var y = 0; y < S; y++) for (var x = 0; x < S; x++) {
+      var d = Math.hypot(x + 0.5 - S / 2, y + 0.5 - S / 2);
+      if (d <= 14) b.set(x, y, d <= 9 ? cc[2] : d <= 12 ? cc[1] : cc[0], 1);
+    }
+    return b.canvas();
+  }
+
+  // Quầng sáng pixel: 3 vòng độ trong suốt giảm dần
+  function glowCanvas(R, rgb, a) {
+    var S = R * 2 + 1, c = PX.canvas(S, S), g = c.getContext('2d');
+    for (var y = 0; y < S; y++) for (var x = 0; x < S; x++) {
+      var d = Math.hypot(x - R, y - R) / R;
+      if (d > 1) continue;
+      g.fillStyle = 'rgba(' + rgb + ',' + (a * (d < 0.35 ? 1 : d < 0.65 ? 0.55 : 0.25)).toFixed(3) + ')';
+      g.fillRect(x, y, 1, 1);
+    }
+    return c;
+  }
+
+  /* ---------------------------------------------------------
      GẮN CẢNH VÀO CANVAS
      --------------------------------------------------------- */
   function mount(canvas, opts) {
     opts = opts || {};
     var ctx = canvas.getContext('2d');
+    // Lớp "thế giới" (đảo, cây, sinh vật) vẽ riêng để phủ ánh sáng theo giờ mà không phủ bầu trời
+    var world = PX.canvas(1, 1), wctx = world.getContext('2d');
     var seed = (opts.seed | 0) || 2026;
     var reduce = !!opts.reducedMotion;
     var rnd = PX.rng(seed * 7 + 1);
 
+    var i;
+
+    // ----- Mùa & giờ: theo tháng/giờ của người xem, hoặc cố định qua opts -----
+    var now0 = new Date();
+    // timeMode: 'live' theo đồng hồ thật | 'fixed' cố định từ đường dẫn/config | 'hour' chọn trên đồng hồ thời gian
+    var seasonFixed = !!SEASONS[opts.season];
+    var seasonKey = seasonFixed ? opts.season : seasonAt(now0);
+    var timeMode = PHASES[opts.time] ? 'fixed' : 'live', manualHour = null;
+    var phaseKey = timeMode === 'fixed' ? opts.time : phaseAt(now0);
+    var S = SEASONS[seasonKey], P = PHASES[phaseKey];
+    T.grass = ramp(S.grass); T.leaf = ramp(S.leaf); T.sky = ramp(P.sky);
+    T.flowers = S.flowers; T.litter = S.litter;
+
     var island = buildIsland(seed);
     var tree = buildTree(seed + 101);
     var hero = makeCharacter(opts.character);
-    var cr = PX.rng(seed + 55), i;
-    var farImgs = [], midImgs = [];
-    // Tầng xa: mây tích nhỏ nhạt màu; tầng giữa (sau đảo): mây tích lớn sáng hơn
-    // tầng xa: mây tích nhỏ, nhạt màu (to nhỏ khác nhau cho tự nhiên)
-    for (i = 0; i < 4; i++) farImgs.push(buildCumulus(cr, cr.int(34, 60), cr.int(14, 22), HEX.far));
-    for (i = 0; i < 3; i++) midImgs.push(buildCumulus(cr, cr.int(58, 86), cr.int(24, 32), HEX.mid));
-    // Biển mây: lớp càng gần càng sáng và ngả xanh ngọc (màu lấy từ ảnh gốc)
-    var bankBack = buildBank(cr, 256, 56, [
-      { col: '#4597f0', wisp: '#4fa7f3', top: 16, bw: [28, 48], bh: [8, 14], every: 90 },
-      { col: '#53b2f4', wisp: '#5dc3f6', top: 34, bw: [24, 42], bh: [7, 12], every: 80 }
-    ]);
-    var bankFront = buildBank(cr, 224, 72, [
-      { col: '#5cc5f4', wisp: '#68d3f7', top: 14, bw: [26, 44], bh: [7, 13], every: 70 },
-      { col: '#68d3f7', wisp: '#78e0fa', top: 30, bw: [24, 40], bh: [6, 12], every: 64 },
-      { col: '#76dffa', wisp: '#8beefd', top: 46, bw: [22, 36], bh: [6, 11], every: 60 },
-      { col: '#84e7fb', wisp: '#9cf3fe', top: 60, bw: [20, 34], bh: [5, 10], every: 56 }
-    ]);
+
+    // Mây & biển mây theo giờ. Luôn dùng cùng một seed nên đổi giờ chỉ đổi màu, không đổi hình.
+    // Biển mây: lớp càng gần càng sáng (ban ngày ngả xanh ngọc như ảnh gốc)
+    var BANK_BACK = [{ top: 16, bw: [28, 48], bh: [8, 14], every: 90 }, { top: 34, bw: [24, 42], bh: [7, 12], every: 80 }];
+    var BANK_FRONT = [
+      { top: 14, bw: [26, 44], bh: [7, 13], every: 70 }, { top: 30, bw: [24, 40], bh: [6, 12], every: 64 },
+      { top: 46, bw: [22, 36], bh: [6, 11], every: 60 }, { top: 60, bw: [20, 34], bh: [5, 10], every: 56 }
+    ];
+    var farImgs = [], midImgs = [], bankBack, bankFront, sunImg = null, moonImg = null;
+    function withCols(shapes, cols) {
+      return shapes.map(function (s, k) { return { col: cols[k][0], wisp: cols[k][1], top: s.top, bw: s.bw, bh: s.bh, every: s.every }; });
+    }
+    function buildWeather() {
+      var cr = PX.rng(seed + 55), j;
+      farImgs = []; midImgs = [];
+      // tầng xa: mây tích nhỏ nhạt màu; tầng giữa (sau đảo): mây tích lớn sáng hơn
+      for (j = 0; j < 4; j++) farImgs.push(buildCumulus(cr, cr.int(34, 60), cr.int(14, 22), P.far));
+      for (j = 0; j < 3; j++) midImgs.push(buildCumulus(cr, cr.int(58, 86), cr.int(24, 32), P.mid));
+      bankBack = buildBank(cr, 256, 56, withCols(BANK_BACK, P.bank.slice(0, 2)));
+      bankFront = buildBank(cr, 224, 72, withCols(BANK_FRONT, P.bank.slice(2)));
+      sunImg = P.sun ? buildSun(P.sun) : null;
+      moonImg = P.moon ? buildMoon() : null;
+    }
+    buildWeather();
+
+    // ----- Sinh vật & đồ trang trí -----
+    var W_CFG = opts.world || {};
+    var catImg = buildCat(), birdImg = buildBirds(), lanternImg = buildLantern();
+    var moonGlow = glowCanvas(20, '255,244,200', 0.16), sunGlow = glowCanvas(30, '255,190,120', 0.22);
+    var lanternGlow = glowCanvas(9, '255,165,80', 0.45), flyGlow = glowCanvas(3, '215,255,106', 0.55);
+    var cat = { on: W_CFG.cat !== false, x: 58, y: 21, awake: 0, zs: [], nextZ: 1.5, heart: 0 };
+    // chọn tối đa 4 chỗ treo đèn lồng cách nhau ≥ 10px
+    var lanterns = [];
+    tree.hangs.slice().sort(function (a, b) { return a[0] - b[0]; }).forEach(function (hg) {
+      if (lanterns.length < 4 && (!lanterns.length || hg[0] - lanterns[lanterns.length - 1][0] >= 10)) lanterns.push(hg);
+    });
+    var perches = tree.perches.slice().sort(function (a, b) { return a[1] - b[1]; });
+    var owlPerch = perches.length ? perches[Math.floor(perches.length / 2)] : null;
+    var bird = { st: 'away', next: 6 + rnd() * 8, x: 0, y: 0, face: 1, t0: 0, perch: null, until: 0, fromX: 0, fromY: 0, side: 1, peck: 0 };
+    var owl = { blink: 3, flash: 0, look: 0 };
+    var butterflies = [], flies = [], snow = [], nightStars = [];
+    function setupLife() {
+      var lr = PX.rng(seed + 909), j;
+      butterflies = [];
+      var nb = (W_CFG.butterflies === false || S.snow || phaseKey === 'night') ? 0 : seasonKey === 'autumn' ? 2 : 3;
+      var bcols = ['#ffffff', '#ffe066', '#ff9fd9', '#9fe6ff'];
+      for (j = 0; j < nb; j++) {
+        butterflies.push({ ax: main.cx + lr.range(-48, 40), ay: lr.range(4, 26), ph: lr() * 6.28, sp: lr.range(0.7, 1.2), col: bcols[j % bcols.length] });
+      }
+      flies = [];
+      var nf = Math.round((P.flies || 0) * (S.flies || 0) * (reduce ? 0.5 : 1));
+      for (j = 0; j < nf; j++) {
+        flies.push({ ax: main.cx + lr.range(-75, 75), ay: lr.range(-34, 46), ph: lr() * 6.28, sp: lr.range(0.6, 1.3) });
+      }
+    }
 
     var main = island.main, plat = island.plat, raise = island.raise, tb = island.treeBase;
     var treeDX = tb.x - tree.bx, treeDY = tb.y - tree.by;
+    setupLife();
     var SCENE_TOP = Math.min(0, treeDY + tree.top) - 3;
     var SCENE_BOTTOM = island.bottom + 2;
 
@@ -587,7 +822,7 @@
     var petals = [], fx = [], marker = null, spawnAcc = 0;
     var shake = 0, gust = 0, nextGust = 9, birds = null, nextBirds = 5 + rnd() * 8;
     var treeTaps = 0, lastInteract = -99;
-    var view = { ix: 0, iy: 0, tx: 0, ty: 0, cx: 0, cy: 0 };
+    var view = { ix: 0, iy: 0, tx: 0, ty: 0, cx: 0, cy: 0, catX: -99, catY: -99, birdOn: false, birdX: 0, birdY: 0 };
 
     var ch = { gx: 110, gy: 31, tx: 0, ty: 0, elev: 0, walking: false, face: -1, idle: 0, nextWander: 7, jump: -1, blinkAt: 2, plat: false };
 
@@ -606,6 +841,8 @@
       canvas.style.width = (W * scale / dpr) + 'px';
       canvas.style.height = (H * scale / dpr) + 'px';
       ctx.imageSmoothingEnabled = false;
+      world.width = W; world.height = H;
+      wctx.imageSmoothingEnabled = false;
       sky = buildSky(W, H);
       if (minor) return;
       mode = wide ? 'wide' : 'tall';
@@ -629,11 +866,11 @@
       var lr = PX.rng(seed + W);
       var skyBottom = mode === 'tall' ? baseY + SCENE_BOTTOM - 40 : H * 0.55;
       // Mây thưa, rải đều theo các tầng cao độ để không chồng lên nhau
-      function spread(imgs, n, y0, y1, sp) {
-        var list = [];
+      function spread(src, n, y0, y1, sp) {
+        var list = [], len = (src === 'far' ? farImgs : midImgs).length;
         for (var j = 0; j < n; j++) {
           list.push({
-            img: imgs[j % imgs.length],
+            src: src, k: j % len,   // tra ảnh lúc vẽ → đổi giờ dựng lại mây không cần xếp lại
             x: (j / n) * (W + 160) + lr.range(0, 40),
             y: Math.round(y0 + (j + lr.range(0.1, 0.8)) / n * (y1 - y0)),
             sp: lr.range(sp[0], sp[1])
@@ -641,12 +878,17 @@
         }
         return list;
       }
-      far = spread(farImgs, mode === 'wide' ? 3 + Math.ceil(W / 150) : 2 + Math.ceil(W / 220), 4, skyBottom, [0.9, 1.6]);
-      mid = spread(midImgs, W > 300 ? 3 : 2, baseY + 6, baseY + SCENE_BOTTOM - 40, [2.2, 3.2]);
+      far = spread('far', mode === 'wide' ? 3 + Math.ceil(W / 150) : 2 + Math.ceil(W / 220), 4, skyBottom, [0.9, 1.6]);
+      mid = spread('mid', W > 300 ? 3 : 2, baseY + 6, baseY + SCENE_BOTTOM - 40, [2.2, 3.2]);
       seaTop = mode === 'wide' ? Math.round(H * 0.63) : baseY + SCENE_BOTTOM - 60;
       stars = [];
       for (var j = 0; j < Math.round(W / 30) + 3; j++) {
         stars.push({ x: Math.round(lr() * W), y: Math.round(lr.range(3, mode === 'tall' ? baseY + 70 : H * 0.55)), per: lr.range(2.4, 4.8), ph: lr() });
+      }
+      // bầu trời sao cho ban đêm (bình minh/hoàng hôn chỉ hiện vài ngôi mờ ở trên cao)
+      nightStars = [];
+      for (j = Math.round(W * H / 420); j > 0; j--) {
+        nightStars.push({ x: Math.floor(lr() * W), y: Math.floor(lr() * Math.max(10, seaTop - 4)), b: lr() < 0.12 ? 2 : lr() < 0.55 ? 1 : 0, ph: lr() * 6.28, sp: lr.range(0.5, 2) });
       }
     }
 
@@ -709,7 +951,8 @@
       });
     }
     function updatePetals(dt) {
-      spawnAcc += ((reduce ? 0.5 : 1.7) + gust * 7) * dt;
+      // cánh hoa (xuân), lá xanh (hạ), lá phong (thu), cục tuyết (đông) rơi từ cây
+      spawnAcc += (S.rate * (reduce ? 0.3 : 1) + gust * S.rate * 4) * dt;
       while (spawnAcc >= 1) { spawnAcc -= 1; spawnPetal(false); }
       var wind = 6 + Math.sin(t * 0.23) * 3 + gust * 16;
       for (var j = petals.length - 1; j >= 0; j--) {
@@ -728,6 +971,65 @@
       }
     }
 
+    // Tuyết rơi khắp trời (mùa đông), đậu lại trên đảo một lúc rồi tan
+    function updateSnow(dt) {
+      if (!S.snow) return;
+      var target = reduce ? 25 : 70;
+      while (snow.length < target) {
+        snow.push({ x: rnd() * (W + 40) - 20, y: -2 - rnd() * (snow.length ? 4 : H), vy: 6 + rnd() * 6, big: rnd() < 0.2, ph: rnd() * 6.28, land: -1 });
+      }
+      var wind = 3 + Math.sin(t * 0.2) * 2 + gust * 8;
+      for (var j = snow.length - 1; j >= 0; j--) {
+        var s = snow[j];
+        if (s.land >= 0) { s.land -= dt; if (s.land <= 0) snow.splice(j, 1); continue; }
+        s.x += (wind * (s.big ? 1.2 : 0.8) + Math.sin(t * 1.7 + s.ph) * 3) * dt;
+        s.y += s.vy * (s.big ? 1.2 : 1) * dt;
+        if (rnd() < dt * 0.8) {
+          var lx = s.x - view.ix, ly = s.y - view.iy;
+          if (inSE(lx, ly, main, 3)) { s.land = 3 + rnd() * 3; s.lx = lx; s.ly = ly; }
+        }
+        if (s.y > H + 3 || s.x > W + 25) snow.splice(j, 1);
+      }
+    }
+
+    // Mèo, chim sẻ / cú, bướm, đom đóm
+    function updateLife(dt) {
+      if (cat.on) {
+        if (cat.awake > 0) cat.awake -= dt;
+        else if (t > cat.nextZ) { cat.zs.push({ x: cat.x - 2, y: cat.y - 8, age: 0 }); cat.nextZ = t + 1.6; }
+        for (var j = cat.zs.length - 1; j >= 0; j--) { cat.zs[j].age += dt; if (cat.zs[j].age > 2.4) cat.zs.splice(j, 1); }
+        if (cat.heart > 0) cat.heart -= dt;
+      }
+      if (W_CFG.birds === false) return;
+      if (phaseKey === 'night') {
+        owl.blink -= dt;
+        if (owl.blink < -0.15) owl.blink = 2.5 + rnd() * 3;
+        if (owl.flash > 0) owl.flash -= dt;
+        if (owl.look > 0) owl.look -= dt;
+        return;
+      }
+      // chim sẻ: bay tới → đậu trên ngọn cây → bay đi
+      if (bird.st === 'away') {
+        if (!reduce && perches.length && t > bird.next) {
+          bird.perch = perches[Math.floor(rnd() * Math.min(perches.length, 4))];
+          bird.side = rnd() < 0.5 ? -1 : 1;
+          bird.fromX = bird.perch[0] + bird.side * (W * 0.6); bird.fromY = bird.perch[1] - 40;
+          bird.st = 'in'; bird.t0 = t; bird.face = -bird.side;
+        }
+      } else if (bird.st === 'in' && t - bird.t0 > 2.6) {
+        bird.st = 'sit'; bird.until = t + 7 + rnd() * 8; bird.peck = t + 1 + rnd() * 2;
+      } else if (bird.st === 'sit') {
+        if (t > bird.until) leaveBird();
+      } else if (bird.st === 'out' && t - bird.t0 > 2.2) {
+        bird.st = 'away'; bird.next = t + 15 + rnd() * 20;
+      }
+    }
+    function leaveBird() {
+      if (bird.st !== 'sit' && bird.st !== 'in') return false;
+      bird.st = 'out'; bird.t0 = t; bird.side = rnd() < 0.5 ? -1 : 1; bird.face = bird.side;
+      return true;
+    }
+
     function burst(x, y, n, cols) {
       for (var j = 0; j < n; j++) {
         var a = rnd() * Math.PI * 2, sp = 14 + rnd() * 26;
@@ -737,6 +1039,7 @@
 
     function shakeTree() {
       shake = 1; gust = Math.max(gust, 0.5);
+      if (leaveBird() && opts.onBird) opts.onBird('sparrow');   // rung cây làm chim bay mất
       treeTaps++;
       var secret = treeTaps % 7 === 0;
       for (var j = 0; j < (secret ? 70 : 22); j++) spawnPetal(true);
@@ -763,6 +1066,16 @@
         if (opts.onCharacter) opts.onCharacter();
         return;
       }
+      if (cat.on && Math.abs(vx - view.catX) <= 7 && vy >= view.catY - 9 && vy <= view.catY + 2) {
+        cat.awake = 3.2; cat.heart = 1.4; cat.zs = [];
+        if (opts.onCat) opts.onCat();
+        return;
+      }
+      if (view.birdOn && Math.abs(vx - view.birdX) <= 5 && vy >= view.birdY - 9 && vy <= view.birdY + 2) {
+        if (phaseKey === 'night') { owl.flash = 0.7; owl.look = 1.6; if (opts.onBird) opts.onBird('owl'); }
+        else if (leaveBird() && opts.onBird) opts.onBird('sparrow');
+        return;
+      }
       if (treeHit(Math.floor(vx - view.tx), Math.floor(vy - view.ty))) { shakeTree(); return; }
       var p = groundTarget(vx - view.ix, vy - view.iy);
       if (p) {
@@ -780,9 +1093,9 @@
 
     function drawLayer(list, par, shiftX) {
       for (var j = 0; j < list.length; j++) {
-        var c = list[j], span = W + c.img.width + 60;
-        var x = ((c.x + t * c.sp * (reduce ? 0.4 : 1) + shiftX) % span + span) % span - c.img.width - 30;
-        ctx.drawImage(c.img, Math.round(x), Math.round(c.y - scrollV * par));
+        var c = list[j], img = (c.src === 'far' ? farImgs : midImgs)[c.k], span = W + img.width + 60;
+        var x = ((c.x + t * c.sp * (reduce ? 0.4 : 1) + shiftX) % span + span) % span - img.width - 30;
+        ctx.drawImage(img, Math.round(x), Math.round(c.y - scrollV * par));
       }
     }
     function drawBank(bank, y, off) {
@@ -805,6 +1118,7 @@
       }
     }
     function drawBirds(dt) {
+      if (phaseKey === 'night') return;
       if (!birds) {
         if (!reduce && t > nextBirds) birds = { x: -10, y: 8 + rnd() * Math.max(20, baseY * 0.6), vx: 11 + rnd() * 5, n: 2 + (rnd() * 2 | 0) };
         return;
@@ -850,8 +1164,200 @@
       view.cx = gx; view.cy = sy;
     }
 
+    /* ----- Vẽ: bầu trời theo giờ ----- */
+    function drawNightSky() {
+      if (phaseKey === 'day') return;
+      var night = phaseKey === 'night', cols = ['#34437f', '#8191d2', '#e8eeff'];
+      for (var j = 0; j < nightStars.length; j++) {
+        var s = nightStars[j];
+        if (!night && (s.b === 0 || s.y > seaTop * 0.35)) continue;   // bình minh/hoàng hôn: vài ngôi trên cao
+        var b = Math.min(2, s.b + (Math.sin(t * s.sp + s.ph) > 0.75 ? 1 : 0));
+        px(s.x, s.y - scrollV * 0.05, 1, 1, cols[night ? b : Math.min(1, b)]);
+      }
+      if (moonImg) {
+        var mx = Math.round(mode === 'wide' ? W * 0.1 : W * 0.16);
+        var my = Math.round((mode === 'wide' ? H * 0.12 : Math.max(8, 64 * dpr / scale) + 8) - scrollV * 0.08);
+        ctx.drawImage(moonGlow, mx - 20, my - 20);
+        ctx.drawImage(moonImg, mx - 7, my - 7);
+      }
+    }
+    function drawSun() {
+      if (!sunImg) return;
+      var x = Math.round(W * (mode === 'wide' ? 0.12 : 0.8)), y = Math.round(seaTop - 4 - scrollV * 0.45);
+      ctx.drawImage(sunGlow, x - 30, y - 30);
+      ctx.drawImage(sunImg, x - 14, y - 14);
+    }
+
+    /* ----- Vẽ: sinh vật (trên lớp thế giới) ----- */
+    function drawCat(ix, iy) {
+      if (!cat.on) return;
+      var cx = ix + cat.x, cy = iy + cat.y;
+      var img = cat.awake > 0 ? catImg.awake : (!reduce && Math.floor(t * 0.8) % 2 ? catImg.breathe : catImg.sleep);
+      ctx.fillStyle = 'rgba(12,40,22,0.35)';
+      ctx.fillRect(cx - 5, cy, 10, 1);
+      ctx.drawImage(img, cx - 6, cy - img.height + 1);
+      view.catX = cx; view.catY = cy;
+    }
+    function drawBird() {
+      view.birdOn = false;
+      if (W_CFG.birds === false) return;
+      var img, x, y;
+      if (phaseKey === 'night') {               // cú mèo đậu suốt đêm
+        if (!owlPerch) return;
+        x = view.tx + owlPerch[0] + swayAt(owlPerch[1]); y = view.ty + owlPerch[1];
+        img = owl.blink < 0 ? birdImg.owlBlink : birdImg.owl;
+        ctx.drawImage(img, x - 3, y - img.height + 1);
+        view.birdOn = true; view.birdX = x; view.birdY = y;
+        return;
+      }
+      if (bird.st === 'away' || !bird.perch) return;
+      var f = bird.face > 0 ? 0 : 1, prx = bird.perch[0], pry = bird.perch[1];
+      var sx = view.tx + prx + swayAt(pry), sy = view.ty + pry;
+      if (bird.st === 'sit') {
+        if (t > bird.peck + 0.35) bird.peck = t + 0.8 + rnd() * 2.5;
+        img = (t > bird.peck ? birdImg.peck : birdImg.sit)[f];
+        x = sx; y = sy;
+        view.birdOn = true;
+      } else {
+        var u = Math.min(1, (t - bird.t0) / (bird.st === 'in' ? 2.6 : 2.2));
+        if (bird.st === 'in') {
+          var e = 1 - Math.pow(1 - u, 2), fx0 = view.tx + bird.fromX, fy0 = view.ty + bird.fromY;
+          x = fx0 + (sx - fx0) * e; y = fy0 + (sy - fy0) * e - Math.sin(u * Math.PI) * 8;
+          view.birdOn = true;
+        } else {
+          x = sx + bird.side * u * W * 0.7; y = sy - u * 50 - Math.sin(u * Math.PI) * 6;
+        }
+        img = (Math.floor(t * 10) % 2 ? birdImg.up : birdImg.down)[f];
+      }
+      ctx.drawImage(img, Math.round(x) - 4, Math.round(y) - img.height + 1);
+      view.birdX = x; view.birdY = y;
+    }
+    function drawButterflies(ix, iy) {
+      for (var j = 0; j < butterflies.length; j++) {
+        var b = butterflies[j];
+        var x = Math.round(ix + b.ax + Math.sin(t * 0.5 * b.sp + b.ph) * 22 + Math.sin(t * 1.3 * b.sp + b.ph * 2) * 4);
+        var y = Math.round(iy + b.ay + Math.sin(t * 0.9 * b.sp + b.ph * 3) * 6 - Math.abs(Math.sin(t * 3 * b.sp + b.ph)) * 2);
+        ctx.fillStyle = b.col;
+        if (Math.floor(t * 9 * b.sp + b.ph) % 2 === 0) {   // cánh mở
+          ctx.fillRect(x - 2, y - 1, 2, 1); ctx.fillRect(x + 1, y - 1, 2, 1);
+          ctx.fillRect(x - 1, y, 1, 1); ctx.fillRect(x + 1, y, 1, 1);
+        } else {                                           // cánh khép
+          ctx.fillRect(x - 1, y - 2, 1, 2); ctx.fillRect(x + 1, y - 2, 1, 2);
+        }
+        ctx.fillStyle = INK;
+        ctx.fillRect(x, y - 1, 1, 2);
+      }
+    }
+
+    /* ----- Vẽ: ánh sáng (sau khi phủ màu theo giờ, nên luôn sáng rõ) ----- */
+    function lanternAt(hg, j) {
+      return { x: view.tx + hg[0] + swayAt(hg[1]) + Math.round(Math.sin(t * 1.6 + j * 1.3) * 0.6), y: view.ty + hg[1] };
+    }
+    function drawLanterns() {
+      if (!P.lanterns || !lanterns.length) return;
+      ctx.globalCompositeOperation = 'lighter';
+      lanterns.forEach(function (hg, j) {
+        var p = lanternAt(hg, j);
+        ctx.globalAlpha = 0.85 + Math.sin(t * 7 + j * 2) * 0.08 + Math.sin(t * 13 + j) * 0.05;   // lửa bập bùng
+        ctx.drawImage(lanternGlow, p.x - 9, p.y - 5);
+      });
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      lanterns.forEach(function (hg, j) {
+        var p = lanternAt(hg, j);
+        px(p.x, p.y, 1, 2, '#2a1a1a');
+        ctx.drawImage(lanternImg, p.x - 2, p.y + 1);
+      });
+    }
+    function drawFireflies() {
+      if (!flies.length) return;
+      ctx.globalCompositeOperation = 'lighter';
+      for (var j = 0; j < flies.length; j++) {
+        var f = flies[j], g = 0.5 + 0.5 * Math.sin(t * 1.8 * f.sp + f.ph * 5);
+        if (g < 0.2) continue;
+        var x = Math.round(view.ix + f.ax + Math.sin(t * 0.6 * f.sp + f.ph) * 10 + Math.sin(t * 0.23 + f.ph * 3) * 6);
+        var y = Math.round(view.iy + f.ay + Math.cos(t * 0.5 * f.sp + f.ph * 1.7) * 6);
+        ctx.globalAlpha = g;
+        ctx.drawImage(flyGlow, x - 3, y - 3);
+        px(x, y, 1, 1, '#f6ffb0');
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    function drawOwlEyes() {
+      if (phaseKey !== 'night' || !view.birdOn || owl.blink < 0) return;
+      var x = Math.round(view.birdX), y = Math.round(view.birdY), c = owl.flash > 0 ? '#ffffff' : '#ffe066';
+      px(x - 1, y - 4, 1, 1, c);
+      px(x + 1, y - 4, 1, 1, c);
+    }
+    function drawCatFx() {
+      if (!cat.on) return;
+      ctx.fillStyle = '#eaf4ff';
+      cat.zs.forEach(function (z) {
+        var u = z.age / 2.4, x = Math.round(view.ix + z.x - u * 3), y = Math.round(view.iy + z.y - u * 9);
+        ctx.globalAlpha = u > 0.75 ? (1 - u) / 0.25 : 1;
+        if (u > 0.35) {   // chữ Z lớn dần khi bay lên
+          ctx.fillRect(x, y, 4, 1); ctx.fillRect(x + 2, y + 1, 1, 1); ctx.fillRect(x + 1, y + 2, 1, 1); ctx.fillRect(x, y + 3, 4, 1);
+        } else {
+          ctx.fillRect(x, y, 3, 1); ctx.fillRect(x + 1, y + 1, 1, 1); ctx.fillRect(x, y + 2, 3, 1);
+        }
+      });
+      ctx.globalAlpha = 1;
+      if (cat.heart > 0) {
+        var hx = view.catX - 4, hy = view.catY - 14 - Math.round((1.4 - cat.heart) * 4);
+        ctx.fillStyle = '#ff6f9a';
+        ctx.fillRect(hx + 1, hy, 1, 1); ctx.fillRect(hx + 3, hy, 1, 1);
+        ctx.fillRect(hx, hy + 1, 5, 1); ctx.fillRect(hx + 1, hy + 2, 3, 1); ctx.fillRect(hx + 2, hy + 3, 1, 1);
+      }
+    }
+
+    // Chuyển cảnh mờ dần: chụp khung hình hiện tại rồi phủ lên cảnh mới, nhạt dần
+    var fadeCv = PX.canvas(1, 1), fadeT = 0;
+    function snapshot() {
+      if (reduce || !W) return;
+      fadeCv.width = W; fadeCv.height = H;
+      fadeCv.getContext('2d').drawImage(canvas, 0, 0);
+      fadeT = 1;
+    }
+    function notifyWorld() { if (opts.onWorld) opts.onWorld({ phase: phaseKey, season: seasonKey, theme: P.theme }); }
+    function applyPhase(ph) {
+      if (ph === phaseKey) return;
+      snapshot();
+      phaseKey = ph; P = PHASES[ph];
+      T.sky = ramp(P.sky);
+      buildWeather();
+      sky = buildSky(W, H);
+      setupLife();
+      notifyWorld();
+    }
+    function applySeason(key) {
+      if (key === seasonKey) return;
+      snapshot();
+      seasonKey = key; S = SEASONS[key];
+      T.grass = ramp(S.grass); T.leaf = ramp(S.leaf); T.flowers = S.flowers; T.litter = S.litter;
+      // cùng seed nên đảo/cây giữ nguyên hình dáng, chỉ đổi màu theo mùa
+      island = buildIsland(seed);
+      tree = buildTree(seed + 101);
+      petals = []; snow = [];
+      setupLife();
+      notifyWorld();
+    }
+    // Theo đồng hồ thật: tự đổi khung giờ khi qua mốc (vd. 17:00 → hoàng hôn) và đổi mùa khi sang tháng
+    var nextPhaseCheck = 15;
+    function checkPhase() {
+      if (timeMode !== 'live' || t < nextPhaseCheck) return;
+      nextPhaseCheck = t + 15;
+      var d = new Date();
+      applyPhase(phaseAt(d));
+      if (!seasonFixed) applySeason(seasonAt(d));
+    }
+
     function update(dt) {
       t += dt;
+      if (fadeT > 0) fadeT = Math.max(0, fadeT - dt / 0.9);
+      checkPhase();
+      updateLife(dt);
+      updateSnow(dt);
       scrollV = mode === 'tall' ? (window.scrollY || 0) * dpr / scale : 0;
       parX += (parT - parX) * Math.min(1, dt * 3);
       shake *= Math.exp(-dt * 3);
@@ -869,7 +1375,9 @@
 
     function render(dt) {
       ctx.drawImage(sky, 0, 0);
+      drawNightSky();
       drawStars();
+      drawSun();
       var pxo = Math.round(parX * 3);
       drawLayer(far, 0.12, pxo);
       drawBirds(dt);
@@ -877,6 +1385,10 @@
       // Biển mây nằm sau đảo (giống ảnh gốc: các mảnh đá nổi phía trước mây)
       drawBank(bankBack, seaTop - 14 - scrollV * 0.5, t * 2 + pxo * 2);
       drawBank(bankFront, seaTop + 14 - scrollV * 0.6, t * 3.5 + pxo * 3);
+
+      // Lớp thế giới: vẽ riêng rồi phủ ánh sáng theo giờ (hoàng hôn ấm, đêm xanh thẫm)
+      var mainCtx = ctx;
+      if (P.tint) { wctx.clearRect(0, 0, W, H); ctx = wctx; }
 
       var rise = reduce ? 0 : Math.round(Math.pow(1 - Math.min(1, t / 1.8), 3) * 80);
       var bob = reduce ? 0 : Math.round(Math.sin(t * 0.9) * 1.4);
@@ -893,7 +1405,10 @@
 
       for (var j = 0; j < petals.length; j++) {
         var p = petals[j];
-        if (p.land >= 0 && (p.land > 0.6 || Math.floor(p.land * 8) % 2)) px(ix + p.lx, iy + p.ly, 1, 1, HEX.bloom[4]);
+        if (p.land >= 0 && (p.land > 0.6 || Math.floor(p.land * 8) % 2)) px(ix + p.lx, iy + p.ly, 1, 1, S.fall[1]);
+      }
+      for (j = 0; j < snow.length; j++) {
+        if (snow[j].land >= 0) px(ix + snow[j].lx, iy + snow[j].ly, 1, 1, '#ffffff');
       }
       if (marker && Math.floor(marker.age * 8) % 2 === 0) {
         var mx = Math.round(ix + marker.x), my = Math.round(iy + marker.y - (onPlat(marker.x, marker.y) ? raise : 0));
@@ -901,20 +1416,46 @@
         ctx.fillRect(mx - 2, my, 1, 1); ctx.fillRect(mx + 2, my, 1, 1); ctx.fillRect(mx, my - 1, 1, 1); ctx.fillRect(mx, my + 1, 1, 1);
       }
 
+      drawCat(ix, iy);
       if (ch.gy < plat.cy) { drawChar(ix, iy); drawTree(view.tx, view.ty); }
       else { drawTree(view.tx, view.ty); drawChar(ix, iy); }
+      drawBird();
+      drawButterflies(ix, iy);
 
       for (j = 0; j < petals.length; j++) {
         p = petals[j];
         if (p.land >= 0) continue;
         var fl = Math.sin(t * 5 + p.ph);
-        px(p.x, p.y, Math.abs(fl) > 0.8 ? 2 : 1, 1, HEX.bloom[fl > 0.3 ? 5 : fl > -0.3 ? 4 : 3]);
+        px(p.x, p.y, Math.abs(fl) > 0.8 ? 2 : 1, 1, S.fall[fl > 0.3 ? 2 : fl > -0.3 ? 1 : 0]);
       }
+      for (j = 0; j < snow.length; j++) {
+        var sn = snow[j];
+        if (sn.land < 0) px(sn.x, sn.y, sn.big ? 2 : 1, sn.big ? 2 : 1, sn.big ? '#ffffff' : '#e6eeff');
+      }
+
+      if (P.tint) {
+        ctx.globalCompositeOperation = 'source-atop';   // chỉ phủ lên những gì đã vẽ
+        ctx.fillStyle = P.tint;
+        ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx = mainCtx;
+        ctx.drawImage(world, 0, 0);
+      }
+      drawLanterns();
+      drawFireflies();
+      drawOwlEyes();
+      drawCatFx();
 
       for (j = 0; j < fx.length; j++) {
         var f = fx[j];
         px(f.x, f.y, 1, 1, f.c);
         if (f.age < 0.15) px(f.x - 1, f.y, 3, 1, f.c);
+      }
+
+      if (fadeT > 0) {   // cảnh cũ nhạt dần sau khi đổi giờ/mùa
+        ctx.globalAlpha = fadeT;
+        ctx.drawImage(fadeCv, 0, 0);
+        ctx.globalAlpha = 1;
       }
 
       if (opts.onFrame) {
@@ -941,8 +1482,27 @@
     window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(resize, 120); });
     resize();
     requestAnimationFrame(loop);
+    if (opts.onWorld) opts.onWorld({ phase: phaseKey, season: seasonKey, theme: P.theme });
 
     return {
+      world: function () {
+        return { phase: phaseKey, season: seasonKey, live: timeMode === 'live', seasonLive: !seasonFixed, hour: manualHour };
+      },
+      // Đồng hồ thời gian: h = giờ (0–24, có phần lẻ) hoặc null để quay về giờ thật
+      setTime: function (h) {
+        if (h === null || h === undefined) {
+          timeMode = 'live'; manualHour = null; nextPhaseCheck = 0;
+          applyPhase(phaseAt(new Date()));
+          return;
+        }
+        timeMode = 'hour'; manualHour = ((h % 24) + 24) % 24;
+        applyPhase(phaseAtHour(manualHour));
+      },
+      // key: 'spring' | 'summer' | 'autumn' | 'winter', hoặc null để theo tháng thật
+      setSeason: function (key) {
+        if (!key) { seasonFixed = false; applySeason(seasonAt(new Date())); return; }
+        if (SEASONS[key]) { seasonFixed = true; applySeason(key); }
+      },
       jump: jump,
       shakeTree: shakeTree,
       drawAvatar: hero.drawAvatar,
@@ -950,5 +1510,9 @@
     };
   }
 
-  window.IslandScene = { mount: mount };
+  window.IslandScene = {
+    mount: mount,
+    marks: PHASE_MARKS, seasonStarts: SEASON_STARTS,
+    phaseAtHour: phaseAtHour, seasonOfMonth: seasonOfMonth
+  };
 })();

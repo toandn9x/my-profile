@@ -17,8 +17,9 @@
     // trời gần như phẳng như ảnh gốc, chỉ đậm nhẹ ở trên
     sky: ['#2e6fe3', '#3175e7', '#347aea', '#377fed', '#3a84ef', '#3e8af0', '#4290f1'],
     // mây giữa trời: [tông đậm, tông sáng]
-    far: ['#4193f1', '#4ba3f5'],
-    mid: ['#4da6f7', '#5cc4f9']
+    // mây trên trời: 5 sắc độ tối → sáng, bóng ngả lam, sáng ngả xanh ngọc như biển mây
+    far: ['#4f9ff2', '#66b4f5', '#86c8f7', '#a8dbf9', '#c9ecfc'],   // xa: tương phản thấp, hoà vào trời
+    mid: ['#5aaaf3', '#7fc4f6', '#a9def9', '#d4f2fd', '#f6fdff']    // gần: sáng rõ, đỉnh gần trắng
   };
   var R = {};
   Object.keys(HEX).forEach(function (k) { R[k] = ramp(HEX[k]); });
@@ -391,57 +392,83 @@
     return { img: buf.canvas(), fill: layers[layers.length - 1].col };
   }
 
-  // Mây giữa trời: thân phồng nhỏ kéo theo đuôi dài uốn lượn có móc cuộn,
-  // tô hai tông như ảnh gốc: nửa trên sáng, nửa dưới đậm
-  function buildSkyCloud(r, w, h, cols) {
-    var shape = new PX.Buf(w, h), ON = 1;
-    var left = r() < 0.5, bodyW = w * r.range(0.3, 0.45);
-    var bx0 = left ? r.range(1, 4) : w - bodyW - r.range(1, 4), baseY = h - 2, x, xx, y;
-    x = bx0 + bodyW * 0.18;
-    while (x < bx0 + bodyW * 0.85) {
-      var bw = r.range(h * 0.7, h * 1.2), bh = r.range(h * 0.4, h * 0.85);
-      for (xx = Math.floor(x - bw / 2); xx <= Math.ceil(x + bw / 2); xx++) {
-        var u = (xx + 0.5 - x) / (bw / 2);
-        if (Math.abs(u) >= 1) continue;
-        for (y = Math.round(baseY - bh * Math.sqrt(1 - u * u)); y <= baseY; y++) shape.set(xx, y, ON, 1);
-      }
-      x += bw * r.range(0.45, 0.7);
-    }
-    var dir = left ? 1 : -1, sx = left ? bx0 + bodyW * 0.75 : bx0 + bodyW * 0.25;
-    var tail = Math.max(4, h * r.range(0.36, 0.46));
-    ribbon(shape, ON, {
-      x: sx, y: baseY - tail / 2 - r.range(0, h * 0.15), len: w - bodyW - 8, dir: dir, amp: r.range(1, h * 0.14),
-      waves: r.range(1, 1.8), phase: r.range(0, 1), thick: tail,
-      shape: 'out', curl: Math.max(3, tail * 0.75), up: -1
-    });
-    if (r() < 0.6) {
-      var tail2 = Math.max(3, h * 0.26);
-      ribbon(shape, ON, {
-        x: sx - dir * bodyW * 0.3, y: baseY - tail2 / 2, len: (w - bodyW) * r.range(0.4, 0.65), dir: dir, amp: r.range(1, 2),
-        waves: r.range(0.8, 1.4), phase: r.range(1, 2.5), thick: tail2, shape: 'out', curl: Math.max(2.5, tail2 * 0.8), up: 1
-      });
-    }
+  // Đổi bản đồ sắc độ (-1 = trong suốt) thành ảnh theo bảng màu
+  function toneCanvas(idx, w, h, pal) {
+    var b = new PX.Buf(w, h), cols = pal.map(function (c) { return PX.hex(c); });
+    for (var i = 0; i < idx.length; i++) if (idx[i] >= 0) { b.d[i] = cols[idx[i]]; b.k[i] = 1; }
+    return b.canvas();
+  }
 
-    // Tô màu: mỗi cột, phần trên của mỗi đoạn mây là màu sáng
-    var out = new PX.Buf(w, h), base = PX.hex(cols[0]), light = PX.hex(cols[1]);
-    for (xx = 0; xx < w; xx++) {
-      y = 0;
-      while (y < h) {
-        if (!shape.kind(xx, y)) { y++; continue; }
-        var y0 = y;
-        while (y < h && shape.kind(xx, y)) y++;
-        var lit = Math.max(1, Math.round((y - y0) * 0.45));
-        for (var yy = y0; yy < y; yy++) out.set(xx, yy, yy < y0 + lit ? light : base, 1);
+  // Dọn mép kiểu vẽ tay: bỏ pixel thò ra lẻ loi, lấp lỗ đơn, xoá chấm màu lạc giữa mảng
+  function tidy(idx, w, h) {
+    function at(a, x, y) { return x < 0 || y < 0 || x >= w || y >= h ? -1 : a[y * w + x]; }
+    for (var pass = 0; pass < 2; pass++) {
+      var c = idx.slice();
+      for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+        var n = [at(c, x - 1, y), at(c, x + 1, y), at(c, x, y - 1), at(c, x, y + 1)];
+        var solid = n.filter(function (v) { return v >= 0; });
+        var k = y * w + x;
+        if (c[k] >= 0 && solid.length <= 1) idx[k] = -1;
+        else if (c[k] < 0 && solid.length >= 3) idx[k] = Math.max.apply(null, solid);
+        else if (c[k] >= 0 && solid.length === 4 && n[0] === n[1] && n[1] === n[2] && n[2] === n[3] && n[0] !== c[k]) idx[k] = n[0];
       }
     }
-    // Nét xoáy đậm bên trong thân mây
-    var swirl = new PX.Buf(w, h);
-    ribbon(swirl, ON, {
-      x: bx0 + bodyW * (left ? 0.25 : 0.75), y: baseY - h * 0.35, len: bodyW * 0.35, dir: dir, amp: 0.8,
-      waves: 1, phase: 0, thick: 1, shape: 'out', curl: Math.max(1.8, h * 0.13), up: 1
-    });
-    for (var i = 0; i < swirl.k.length; i++) if (swirl.k[i] && out.k[i]) out.d[i] = base;
-    return out.canvas();
+  }
+
+  // Mây tích (cumulus) pixel art, theo các nguyên tắc vẽ mây pixel:
+  //  - ghép từ nhiều cụm tròn: hàng dưới nhiều cụm nhỏ, hàng giữa cụm lớn, đỉnh 1–2 cụm, đáy phẳng
+  //  - cụm thấp nằm trước cụm cao; tô sáng RIÊNG từng cụm như một quả cầu, nắng từ trên-trái
+  //    (viền trên-trái gần trắng, dưới-phải tối) → không bị "pillow shading"
+  //  - khe ngay sau mép cụm phía trước và phần đáy chìm trong bóng (bóng ngả lam, không xám)
+  // pal: 5 sắc độ từ tối đến sáng
+  function buildCumulus(r, w, h, pal) {
+    var baseY = h - 2, puffs = [], i, x, y, t, rad;
+    function bell(u) { return Math.max(0, 1 - Math.pow((u - 0.5) * 2, 2)); }
+    var n0 = Math.max(3, Math.round(w / (h * 0.68)));
+    for (i = 0; i < n0; i++) {
+      t = (i + 0.5) / n0; rad = h * (0.2 + 0.14 * bell(t)) * r.range(0.85, 1.15);
+      puffs.push({ x: w * (0.06 + 0.88 * t) + r.range(-1.5, 1.5), y: baseY - rad * 0.5, r: rad });
+    }
+    var n1 = Math.max(2, Math.round(n0 * 0.5));
+    for (i = 0; i < n1; i++) {
+      t = (i + 0.5) / n1; rad = h * (0.27 + 0.12 * bell(t)) * r.range(0.9, 1.1);
+      puffs.push({ x: w * (0.2 + 0.6 * t) + r.range(-2, 2), y: baseY - h * 0.36, r: rad });
+    }
+    var n2 = r() < 0.5 ? 1 : 2;
+    for (i = 0; i < n2; i++) {
+      puffs.push({ x: w * (n2 === 1 ? r.range(0.4, 0.6) : 0.37 + i * 0.26) + r.range(-2, 2), y: baseY - h * 0.58 + r.range(-1, 1), r: h * r.range(0.25, 0.3) });
+    }
+    // đế mây phẳng liền mạch từ cụm dưới cùng bên trái tới bên phải (không bị lõm răng cưa)
+    var slabL = puffs[0].x, slabR = puffs[n0 - 1].x, slabTop = baseY - h * 0.16;
+    puffs.sort(function (a, b) { return a.y - b.y; });   // cụm cao ở sau, cụm thấp ở trước
+    var L = [-0.45, -0.72, 0.53];
+    var idx = new Int8Array(w * h).fill(-1);
+    for (y = 0; y <= baseY; y++) for (x = 0; x < w; x++) {
+      var px = x + 0.5, py = y + 0.5, own = -1, j;
+      for (j = puffs.length - 1; j >= 0; j--) {
+        var dx = px - puffs[j].x, dy = py - puffs[j].y;
+        if (dx * dx + dy * dy <= puffs[j].r * puffs[j].r) { own = j; break; }
+      }
+      if (own < 0) {
+        if (py >= slabTop && px >= slabL && px <= slabR) idx[y * w + x] = baseY - y < Math.max(1, h * 0.1) ? 1 : 2;
+        continue;
+      }
+      var p = puffs[own], nx = (px - p.x) / p.r, ny = (py - p.y) / p.r;
+      var nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+      // sáng theo từng cụm + chuyển sắc theo chiều cao để cả đám mây liền một khối
+      var lam = (nx * L[0] + ny * L[1] + nz * L[2]) * 0.75 + (0.5 - py / h) * 0.7 + 0.08;
+      var lv = lam > 0.72 ? 4 : lam > 0.42 ? 3 : lam > 0.08 ? 2 : lam > -0.3 ? 1 : 0;
+      for (j = own + 1; j < puffs.length; j++) {          // đường tách mảnh phía trên cụm phía trước
+        var d = Math.hypot(px - puffs[j].x, py - puffs[j].y) - puffs[j].r;
+        if (d > 0 && d < 1.2 && py < puffs[j].y) { lv = Math.max(0, lv - 1); break; }
+      }
+      var fromBase = baseY - y;
+      if (fromBase < Math.max(1, h * 0.1)) lv = Math.min(lv, 1);
+      else if (fromBase < h * 0.2) lv = Math.min(lv, 2);
+      idx[y * w + x] = lv;
+    }
+    tidy(idx, w, h);
+    return toneCanvas(idx, w, h, pal);
   }
 
   function buildSky(W, H) {
@@ -533,8 +560,10 @@
     var hero = makeCharacter(opts.character);
     var cr = PX.rng(seed + 55), i;
     var farImgs = [], midImgs = [];
-    for (i = 0; i < 4; i++) farImgs.push(buildSkyCloud(cr, cr.int(80, 130), cr.int(16, 24), HEX.far));
-    for (i = 0; i < 3; i++) midImgs.push(buildSkyCloud(cr, cr.int(56, 92), cr.int(13, 19), HEX.mid));
+    // Tầng xa: mây tích nhỏ nhạt màu; tầng giữa (sau đảo): mây tích lớn sáng hơn
+    // tầng xa: mây tích nhỏ, nhạt màu (to nhỏ khác nhau cho tự nhiên)
+    for (i = 0; i < 4; i++) farImgs.push(buildCumulus(cr, cr.int(34, 60), cr.int(14, 22), HEX.far));
+    for (i = 0; i < 3; i++) midImgs.push(buildCumulus(cr, cr.int(58, 86), cr.int(24, 32), HEX.mid));
     // Biển mây: lớp càng gần càng sáng và ngả xanh ngọc (màu lấy từ ảnh gốc)
     var bankBack = buildBank(cr, 256, 56, [
       { col: '#4597f0', wisp: '#4fa7f3', top: 16, bw: [28, 48], bh: [8, 14], every: 90 },
@@ -598,7 +627,7 @@
       if (opts.onLayout) opts.onLayout({ mode: mode, heroCss: Math.round(heroCss) });
 
       var lr = PX.rng(seed + W);
-      var skyBottom = mode === 'tall' ? baseY + SCENE_BOTTOM - 40 : H * 0.62;
+      var skyBottom = mode === 'tall' ? baseY + SCENE_BOTTOM - 40 : H * 0.55;
       // Mây thưa, rải đều theo các tầng cao độ để không chồng lên nhau
       function spread(imgs, n, y0, y1, sp) {
         var list = [];
@@ -612,7 +641,7 @@
         }
         return list;
       }
-      far = spread(farImgs, 2 + Math.ceil(W / 220), 4, skyBottom, [0.9, 1.6]);
+      far = spread(farImgs, mode === 'wide' ? 3 + Math.ceil(W / 150) : 2 + Math.ceil(W / 220), 4, skyBottom, [0.9, 1.6]);
       mid = spread(midImgs, W > 300 ? 3 : 2, baseY + 6, baseY + SCENE_BOTTOM - 40, [2.2, 3.2]);
       seaTop = mode === 'wide' ? Math.round(H * 0.63) : baseY + SCENE_BOTTOM - 60;
       stars = [];
